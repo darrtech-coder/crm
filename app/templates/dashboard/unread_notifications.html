@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Notifications</h2>
+
+  <h5 class="mt-3">🔔 Unread</h5>
+  <ul class="list-group mb-4">
+    {% for n in unread %}
+      <li class="list-group-item d-flex justify-content-between">
+        <span>{{ n.message }}</span>
+        <small class="text-muted">{{ n.created_at.strftime("%Y-%m-%d %H:%M") }}</small>
+      </li>
+    {% else %}
+      <li class="list-group-item text-muted">No unread notifications</li>
+    {% endfor %}
+  </ul>
+
+  <h5>📬 Read</h5>
+  <ul class="list-group">
+    {% for n in read %}
+      <li class="list-group-item d-flex justify-content-between bg-light">
+        <span>{{ n.message }}</span>
+        <small class="text-muted">{{ n.created_at.strftime("%Y-%m-%d 

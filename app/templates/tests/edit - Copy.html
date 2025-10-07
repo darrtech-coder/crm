@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Edit Test: {{ test.title }}</h2>
+  <form method="POST">
+    <div class="mb-3">
+      <label class="form-label">Title</label>
+      <input type="text" class="form-control" name="title" value="{{ test.title }}">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Description</label>
+      <textarea class="form-control" name="description">{{ test.description }}</textarea>
+    </div>
+    <button class="btn btn-primary">Update</button>
+  </form>
+
+  <hr>
+  <h4>Questions</h4>
+  <ul>
+    {% for q in test.questions %}
+      <li>{{ q.type|capitalize }} – {{ q.question }}</li>
+    {% else %}
+      <li class="text-muted">No questions yet</li>
+    {% endfor %}
+  </ul>
+  <!-- Later: add add-question form -->
+</div>
+{% endblock %}

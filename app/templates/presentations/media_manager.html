@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <a href="{{ url_for('presentations.index') }}" class="btn btn-secondary mb-3">&larr; Back</a>
+  <h2>Media Manager</h2>
+
+  <!-- Upload Form -->
+  {% if current_user.role in ("MANAGER","ADMIN","SUPER_ADMIN") %}
+  <form id="uploadForm" method="POST" enctype="multipart/form-data" action="{{ url_for('presentations.upload_media') }}" class="mb-4">
+    <div class="input-group">
+      <input type="file" name="file" class="form-control" required>
+      <button type="submit" class="btn btn-success">Upload</button>
+    </div>
+  </form>
+  {% endif %}
+
+  <div class="row">
+    {% for f in files %}
+    <div class="col-md-3 mb-3">
+      <div class="card h-100">
+        {% set fname = f.filename.lower() %}
+        {% set thumb = f.filename.rsplit('.',1)[0] ~ '_thumb.jpg' %}
+        {% set filenames = files | map(attribute='filename') | list %}
+
+        {% if thumb in filenames %}
+          <!-- If actual thumbnail file exists -->
+          <img src="{{ url_for('presentations.media_file', filename=thumb) }}" class="card-img-top">
+        {% elif fname.endswith(('.png','.jpg','.jpeg','.gif','.webp')) %}
+          <img src="{{ url_for('presentations.media_file', filename=f.filename) }}" class="card-img-top">
+        {% elif fname.endswith(('.mp4','.avi','.mov','.mkv','.webm')) %}
+          <i class="bi bi-film" style="font-size:40px;"></i>
+        {% elif fname.endswith('.pdf') %}
+          <i class="bi bi-file-earmark-pdf text-danger" style="font-size:40px;"></i>
+        {% else %}
+          <div class="card-body text-center">
+            {% if fname.endswith(('.mp3','.wav','.ogg')) %}
+              <i class="bi bi-music-note-beamed" style="font-size:40px;"></i><br>
+            {% elif fname.endswith(('.doc','.docx')) %}
+              <i class="bi bi-file-earmark-word text-primary" style="font-size:40px;"></i><br>
+            {% elif fname.endswith(('.ppt','.pptx')) %}
+              <i class="bi bi-filetype-ppt text-warning" style="font-size:40px;"></i><br>
+            {% elif fname.endswith(('.xls','.xlsx')) %}
+              <i class="bi bi-file-earmark-excel text-success" style="font-size:40px;"></i><br>
+            {% else %}
+              <i class="bi bi-file-earmark" style="font-size:40px;"></i><br>
+            {% endif %}
+            {{ f.filename }}
+          </div>
+        {% endif %}
+
+        <div class="card-footer text-center">
+          <a href="{{ url_for('presentations.media_file', filename=f.filename) }}" target="_blank" class="btn btn-sm btn-info">View</a>
+          {% if request.args.get('picker') %}
+            <button class="btn btn-sm btn-success" onclick="pickFile('{{ url_for('presentations.media_file', filename=f.filename) }}')">Insert</button>
+          {% else %}
+            <button onclick="deleteFile('{{ f.filename }}')" class="btn btn-sm btn-danger">Delete</button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-muted">No media files uploaded yet</div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+function deleteFile(fname){
+  if(confirm("Delete "+fname+"?")){
+    fetch(`/presentations/media_manager/delete/${fname}`, {method:"POST"})
+      .then(r=>r.json()).then(d=>{
+        if(d.ok){ location.reload(); }
+        else{ alert("Error: "+d.error); }
+      });
+  }
+}
+function pickFile(url){
+  window.opener.postMessage({ fileUrl:url }, "*");
+}
+</script>
+{% endblock %}

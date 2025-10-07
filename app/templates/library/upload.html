@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <div class="card shadow-sm">
+    <div class="card-body">
+  <a href="{{ url_for('library.index') }}" class="btn btn-secondary mb-3">&larr; Back</a>
+      <h2 class="card-title">Upload New Library Item</h2>
+      <p class="text-muted">Managers/Admins can upload PDFs, Word docs, images, videos, or audio, and optionally attach multiple files.</p>
+
+      <form method="POST" enctype="multipart/form-data">
+        <!-- Title -->
+        <div class="mb-3">
+          <label class="form-label">Title</label>
+          <input class="form-control" name="title" placeholder="Enter article title" required>
+        </div>
+
+        <!-- Thumbnail -->
+<div class="mb-3">
+  <label class="form-label">Thumbnail (image)</label>
+  <input type="file" class="form-control" name="thumbnail" accept="image/*">
+</div>
+
+        <!-- Description -->
+        <div class="mb-3">
+          <label class="form-label">Description</label>
+          <textarea class="form-control" name="description" placeholder="Add a short description"></textarea>
+        </div>
+
+        <!-- Keywords -->
+        <div class="mb-3">
+          <label class="form-label">Keywords</label>
+          <input class="form-control" name="keywords" placeholder="e.g. onboarding, sales, compliance">
+        </div>
+
+        <!-- Category -->
+        <div class="mb-3">
+          <label class="form-label">Category</label>
+          <select name="category_id" class="form-select">
+            <option value="">-- No Category --</option>
+            {% for c in categories %}
+              <option value="{{ c.id }}">{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Main File -->
+        <div class="mb-3">
+          <label class="form-label">Main File</label>
+          <input type="file" class="form-control" id="mainFile" name="file" required>
+          <small class="text-muted">This will be the primary document, video, or audio file.</small>
+        </div>
+
+        <!-- Attachments -->
+        <div class="mb-3">
+          <label class="form-label">Additional Attachments</label>
+          <input type="file" class="form-control" name="attachments" multiple>
+          <small class="text-muted">You may attach extra resources (PDFs, slides, multimedia).</small>
+        </div>
+
+<div class="form-check">
+  <input type="checkbox" class="form-check-input" name="manager_only">
+  <label class="form-check-label">Manager-only Content</label>
+</div>
+
+<div class="mt-3">
+  <label>Restrict Access</label>
+  <small class="text-muted">Select teams or enter user IDs that may access.</small>
+  <select name="team_ids" class="form-select" multiple>
+    {% for t in categories %}
+      <option value="{{ t.id }}">{{ t.name }}</option>
+    {% endfor %}
+  </select>
+  <input type="text" class="form-control mt-2" name="user_ids" placeholder="Comma-separated user IDs">
+</div>
+
+
+
+        <div class="d-grid">
+          <button type="submit" class="btn btn-success btn-lg">Upload Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const fileInput = document.getElementById("mainFile");      // specifically the MAIN file input
+  const titleInput = document.querySelector('input[name="title"]');
+
+  if (fileInput && titleInput) {
+    fileInput.addEventListener("change", function() {
+      if (this.files.length > 0) {
+        const fileName = this.files[0].name;
+        const baseName = fileName.replace(/\.[^/.]+$/, ""); // strip extension
+        // Only update the Title if it's empty
+        if (!titleInput.value.trim()) {
+          titleInput.value = baseName;
+        }
+      }
+    });
+  }
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Activity Summary – {{ user.username }}</h2>
+
+  <ul class="nav nav-tabs" id="activityTabs" role="tablist">
+    <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#week">This Week</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#month">This Month</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#alltime">All‑time</a></li>
+  </ul>
+
+  <div class="tab-content p-3 border border-top-0">
+    <div id="week" class="tab-pane fade show active">
+      <h5>Logins this week</h5>
+      <ul>
+        {% for date, count in logins_by_day %}
+          <li>{{ date }}: {{ count }}</li>
+        {% endfor %}
+      </ul>
+      <h5>Library Time this week</h5>
+      <ul>
+        {% for week, duration in library_week %}
+          <li>Week {{ week }}: {{ duration }} seconds</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div id="month" class="tab-pane fade">
+      <p>(TODO: Aggregate by week in current month...)</p>
+    </div>
+    <div id="alltime" class="tab-pane fade">
+      <p>(TODO: Aggregate all records per month...)</p>
+    </div>
+  </div>
+</div>
+<canvas id="loginChart" height="120"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const labels = {{ logins_by_day|map(attribute=0)|list|tojson }};
+const dataCounts = {{ logins_by_day|map(attribute=1)|list|tojson }};
+new Chart(document.getElementById('loginChart'), {
+  type: 'bar',
+  data: { labels: labels,
+          datasets: [{ label: 'Logins', data: dataCounts, backgroundColor: 'steelblue' }]},
+  options: { scales:{ y:{ beginAtZero:true}}}
+});
+</script>
+{% endblock %}

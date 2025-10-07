@@ -1,0 +1,4 @@
+{% macro restrictions(item) %}
+  {% if item.manager_only %}<span class="badge bg-danger ms-1">🔒 Manager</span>{% endif %}
+  {% if item.restricted_access %}<span class="badge bg-warning ms-1">🔒 Restricted</span>{% endif %}
+{% endmacro %}

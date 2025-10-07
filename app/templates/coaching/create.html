@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">Create Coaching Plan</h2>
+      <p class="text-muted">Define objectives, assign to users or teams, and link courses or tests.</p>
+
+      <form method="POST">
+        <!-- Title -->
+        <div class="mb-3">
+          <label class="form-label">Title</label>
+          <input type="text" name="title" class="form-control" placeholder="Coaching Plan Title" required>
+        </div>
+
+        <!-- Description -->
+        <div class="mb-3">
+          <label class="form-label">Description</label>
+          <textarea name="description" class="form-control" rows="3" placeholder="What is the goal of this plan?"></textarea>
+        </div>
+
+        <!-- Due Date -->
+        <div class="mb-3">
+          <label class="form-label">Due Date</label>
+          <input type="date" name="due_date" class="form-control">
+        </div>
+
+        <!-- Pass mark -->
+        <div class="mb-3">
+          <label class="form-label">Pass Mark (%)</label>
+          <input type="number" name="pass_percent" min="0" max="100" value="60" class="form-control">
+        </div>
+
+        <!-- Assignment -->
+        <div class="mb-3">
+          <label class="form-label">Assign To</label>
+          <div class="input-group">
+            <input type="number" name="assigned_to" class="form-control" placeholder="User ID (optional)">
+            <span class="input-group-text">or</span>
+            <select class="form-select" name="team_id">
+              <option value="">-- Assign to Team --</option>
+              {% for t in teams %}
+              <option value="{{ t.id }}">{{ t.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-text">You can assign either to a specific user or to a team.</div>
+        </div>
+
+        <!-- Attach Library Courses -->
+<div class="mb-3 position-relative">
+  <label>Search Library Items</label>
+  <input class="form-control" id="courseSearch">
+  <ul class="list-group position-absolute w-100 shadow-sm" id="courseResult" style="z-index:10;max-height:200px;overflow-y:auto;display:none;"></ul>
+  <input type="hidden" name="items" id="courseId">
+</div>
+
+        <!-- Attach Tests -->
+        <div class="mb-3">
+          <label class="form-label">Attach Tests</label>
+          <select multiple name="tests" class="form-select">
+            {% for t in tests %}
+            <option value="{{ t.id }}">{{ t.title }}</option>
+            {% endfor %}
+          </select>
+          <small class="text-muted">All required courses linked to these tests will be added automatically.</small>
+        </div>
+
+        <div class="d-grid">
+          <button type="submit" class="btn btn-success btn-lg">Create Plan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function enableAutocomplete(inputId, url, hiddenInputId, listId){
+  const input = document.getElementById(inputId);
+  const list = document.getElementById(listId);
+  const hidden = document.getElementById(hiddenInputId);
+  input.addEventListener("input", ()=>{
+    const q = input.value.trim();
+    if(q.length < 2){ list.style.display="none"; return; }
+    fetch(`${url}?q=${encodeURIComponent(q)}`)
+      .then(r=>r.json())
+      .then(data=>{
+        list.innerHTML='';
+        if(!data.length){ list.style.display='none'; return; }
+        data.forEach(row=>{
+          const li=document.createElement("li");
+          li.className="list-group-item list-group-item-action";
+          li.textContent=row.title;
+          li.addEventListener("click",()=>{
+            input.value=row.title;
+            hidden.value=row.id;
+            list.style.display="none";
+          });
+          list.appendChild(li);
+        });
+        list.style.display="block";
+      });
+  });
+}
+
+enableAutocomplete("courseSearch","/coaching/search_courses","courseId","courseResult");
+enableAutocomplete("testSearch","/coaching/search_tests","testId","testResult");
+</script>
+
+{% endblock %}

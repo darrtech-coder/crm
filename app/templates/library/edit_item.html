@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Edit Item: {{ item.title }}</h2>
+
+  <a href="{{ url_for('library.index') }}" class="btn btn-secondary mb-3">&larr; Back</a>
+  <form method="POST" enctype="multipart/form-data">
+    <div class="mb-3">
+      <label class="form-label">Title</label>
+      <input class="form-control" type="text" name="title" value="{{ item.title }}" required>
+    </div>
+
+    <!-- Manager Only -->
+    <div class="form-check mb-3">
+      <input type="checkbox" class="form-check-input" name="manager_only" {% if item.manager_only %}checked{% endif %}>
+      <label class="form-check-label">Manager-only Content</label>
+    </div>
+
+    <!-- Restrict Access -->
+    <div class="mb-3">
+      <label class="form-label">Restrict Access (optional)</label>
+      <select name="team_ids" class="form-select" multiple>
+        {% for t in teams %}
+          <option value="{{ t.id }}"
+            {% for acc in item.restricted_access if acc.team_id == t.id %}selected{% endfor %}>
+            {{ t.name }}
+          </option>
+        {% endfor %}
+      </select>
+      <input type="text" class="form-control mt-2" name="user_ids"
+             value="{{ item.restricted_access | selectattr('user_id') | map(attribute='user_id') | join(', ') }}">
+    </div>
+
+    <div class="mb-3">
+      <label>Description</label>
+      <textarea class="form-control" name="description">{{ item.description }}</textarea>
+    </div>
+
+    <div class="mb-3">
+      <label>Keywords</label>
+      <input class="form-control" type="text" name="keywords" value="{{ item.keywords }}">
+    </div>
+
+
+    <!-- Category -->
+    <div class="mb-3">
+      <label class="form-label">Category</label>
+      <select name="category_id" class="form-select">
+        <option value="">-- No Category --</option>
+        {% for c in categories %}
+          <option value="{{ c.id }}" {% if item.category_id == c.id %}selected{% endif %}>
+            {{ c.name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- File Replacement -->
+    <div class="mb-3">
+      <label>Main File (leave empty to keep current)</label>
+      <input type="file" name="file" class="form-control">
+      <small>Current: {{ item.filename }}</small>
+    </div>
+
+    <div class="mb-3">
+      <label>Thumbnail</label>
+      <input type="file" name="thumbnail" accept="image/*" class="form-control">
+      {% if item.thumbnail %}
+        <img src="{{ url_for('library.download_item', item_id=item.id, thumb=1) }}" width="120">
+      {% endif %}
+    </div>
+
+    <div class="mb-3">
+      <label>Add Attachments</label>
+      <input type="file" name="attachments" multiple class="form-control">
+    </div>
+
+    <button type="submit" class="btn btn-success">Save Changes</button>
+    <a href="{{ url_for('library.view_item', item_id=item.id) }}" class="btn btn-secondary">Cancel</a>
+  </form>
+</div>
+{% endblock %}

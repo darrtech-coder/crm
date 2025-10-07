@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>🧭 Ready to Begin – {{ test.title }}</h2>
+  <p class="text-muted">Review prerequisites before starting.</p>
+
+  <table class="table table-bordered w-auto">
+    <tr><th>Total Questions</th><td>{{ question_count }}</td></tr>
+    <tr><th>Average Score (all users)</th><td>{{ "%.1f"|format(avg_score or 0) }}</td></tr>
+  </table>
+
+
+
+{% if blocked_prereqs %}
+  <hr>
+  <h4>🚫 Required Prerequisite Tests</h4>
+  <ul class="list-group mb-3">
+    {% for t in blocked_prereqs %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        {{ t.title }}
+        <a href="{{ url_for('tests.ready', test_id=t.id) }}" class="btn btn-sm btn-outline-primary">View Test</a>
+      </li>
+    {% endfor %}
+  </ul>
+  <div class="alert alert-danger">
+    You must complete these tests before starting <b>{{ test.title }}</b>.
+  </div>
+{% endif %}
+
+
+  <hr>
+  <h4>📚 Course Requirements</h4>
+  <table class="table table-striped">
+    <thead>
+      <tr><th>Course</th><th>Type</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      {% for r in requirements %}
+        {% set done = r.course.id in completed_ids %}
+        <tr>
+          <td><a href="{{ url_for('library.view_item', item_id=r.course.id) }}" target="_blank">{{ r.course.title }}</a></td>
+          <td class="text-capitalize">{{ r.requirement_type }}</td>
+          <td>
+            {% if done %}
+              <span class="text-success fw-bold">✅ Completed</span>
+            {% else %}
+              <span class="text-danger fw-bold">❌ Not Completed</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="3" class="text-muted">No requirements.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if blocked %}
+    <div class="alert alert-danger">
+      You must complete all <b>required</b> courses before taking this test.
+    </div>
+    <a href="{{ url_for('library.index') }}" class="btn btn-secondary">Return to Library</a>
+  {% else %}
+    {% if recommended_pending %}
+      <div class="alert alert-warning">
+        You have recommended courses not yet completed. You may still proceed.
+      </div>
+    {% endif %}
+    <a href="{{ url_for('tests.take', test_id=test.id) }}" class="btn btn-success btn-lg px-4">🚀 Start Test</a>
+  {% endif %}
+</div>
+{% endblock %}

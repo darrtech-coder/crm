@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4 text-center">
+  <h2 class="mb-4">Agent Dashboard</h2>
+<hr>
+  <div class="row justify-content-center">
+    <div class="col-md-2 mb-3">
+      <a href="{{ url_for('leads.index') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-people-fill display-6 d-block mb-2 text-primary"></i>
+        My Leads
+      </a>
+    </div>
+    <div class="col-md-2 mb-3">
+      <a href="{{ url_for('messaging.rooms') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-chat-dots-fill display-6 d-block mb-2 text-success"></i>
+        Team Chat
+      </a>
+    </div>
+    <div class="col-md-2 mb-3">
+      <a href="{{ url_for('library.index') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-journal-bookmark-fill display-6 d-block mb-2 text-info"></i>
+        Library
+      </a>
+    </div>
+    <div class="col-md-2 mb-3">
+      <a href="{{ url_for('presentations.index') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-easel-fill display-6 d-block mb-2 text-warning"></i>
+        Presentations
+      </a>
+    </div>
+    <div class="col-md-2 mb-3">
+      <a href="{{ url_for('coaching.list_plans') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-lightbulb-fill display-6 d-block mb-2 text-danger"></i>
+        Coaching
+      </a>
+    </div>
+
+<div class="col-md-3 mb-3">
+  <a href="{{ url_for('tests.index') }}" class="btn btn-light w-100 py-3 shadow-sm">
+    <i class="bi bi-check2-square display-6 d-block mb-2 text-info"></i>
+    Take Tests
+  </a>
+</div>
+
+  </div>
+</div>
+{% endblock %}

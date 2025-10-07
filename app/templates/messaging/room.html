@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Chat Room {{ room_id }}</h2>
+  <a href="{{ url_for('messaging.rooms') }}" class="btn btn-secondary mb-3">&larr; Back to Rooms</a>
+
+  <div class="row">
+    <!-- Sidebar with teammates -->
+    <div class="col-md-3">
+      <h5>Teammates</h5>
+      <ul class="list-group" id="teammates-list">
+        {% for mate in teammates if mate.id != current_user.id %}
+        <li class="list-group-item d-flex justify-content-between align-items-center" id="mate-{{mate.id}}">
+          <span>{{ mate.username }} <span class="badge bg-secondary status">…</span></span>
+          <a href="{{ url_for('messaging.create_direct', user_id=mate.id) }}" class="btn btn-sm btn-outline-primary">Message</a>
+        </li>
+        {% else %}
+        <li class="list-group-item">No teammates found</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <!-- Messages + form -->
+    <div class="col-md-9">
+      <!-- Messages list -->
+      <div class="mb-3 border p-3 bg-light" style="height:400px; overflow-y:auto;" id="messages-box">
+        <p class="text-muted">Loading messages…</p>
+      </div>
+
+      <!-- Send message -->
+      <form id="sendForm" class="mt-2">
+        <div class="input-group">
+          <input type="text" class="form-control" id="msgContent" placeholder="Type a message..." required>
+          <button class="btn btn-primary" type="submit">Send</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// Presence polling
+function pollPresence(){
+  fetch("{{ url_for('messaging.presence') }}")
+    .then(r => r.json())
+    .then(data => {
+      data.forEach(u => {
+        let el = document.querySelector("#mate-"+u.id+" .status");
+        if(el){
+          el.className = "badge " + (u.status === "online" ? "bg-success" : "bg-secondary");
+          el.innerText = u.status;
+        }
+      });
+    });
+}
+setInterval(pollPresence, 5000);
+pollPresence();
+
+// Load messages dynamically
+function loadMessages(){
+  fetch("{{ url_for('messaging.room_messages', room_id=room_id) }}")
+    .then(r => r.json())
+    .then(data => {
+      let box = document.getElementById("messages-box");
+      box.innerHTML = "";
+      if(data.length === 0){
+        box.innerHTML = "<p class='text-muted'>No messages yet. Say hi 👋</p>";
+      }
+      data.forEach(m => {
+        let div = document.createElement("div");
+        div.className = "mb-2";
+        div.innerHTML = `<strong>${m.sender}:</strong> ${m.content} <small class="text-muted">(${m.time})</small>`;
+        box.appendChild(div);
+      });
+      box.scrollTop = box.scrollHeight; // auto scroll to bottom
+    });
+}
+setInterval(loadMessages, 3000);
+loadMessages();
+
+// Send message
+document.getElementById("sendForm").addEventListener("submit", function(e){
+  e.preventDefault();
+  const content = document.getElementById("msgContent").value;
+  fetch("{{ url_for('messaging.send_message', room_id=room_id) }}", {
+    method: "POST",
+    headers: {"Content-Type":"application/x-www-form-urlencoded"},
+    body: "content=" + encodeURIComponent(content)
+  })
+  .then(r => r.json())
+  .then(data => {
+    if(data.status === "ok"){
+      document.getElementById("msgContent").value = "";
+      loadMessages(); // refresh messages immediately
+    } else {
+      alert("Error: " + data.message);
+    }
+  });
+});
+
+if(el){
+  if(u.status=="online"){
+    el.className = "badge bg-success";
+    el.innerText = "online";
+  } else {
+    el.className = "badge bg-secondary";
+    el.innerText = u.last_seen ? `last seen ${u.last_seen}` : "offline";
+  }
+}
+</script>
+{% endblock %}

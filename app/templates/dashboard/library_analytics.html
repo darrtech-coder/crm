@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>📊 Library Analytics</h2>
+  <p class="text-muted">Usage statistics across the knowledge base.</p>
+
+  <!-- Most Viewed Items -->
+  <div class="card mb-4">
+    <div class="card-header bg-primary text-white">Top Viewed Items</div>
+    <div class="card-body">
+      <table class="table table-striped">
+        <thead>
+          <tr><th>Title</th><th>Views</th></tr>
+        </thead>
+        <tbody>
+          {% for title, count in views %}
+          <tr><td>{{ title }}</td><td>{{ count }}</td></tr>
+          {% else %}
+          <tr><td colspan="2" class="text-muted">No data</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Average Ratings -->
+  <div class="card mb-4">
+    <div class="card-header bg-info text-white">Average Ratings</div>
+    <div class="card-body">
+      <table class="table table-bordered">
+        <thead>
+          <tr><th>Title</th><th>Ease</th><th>Completeness</th><th>Overall</th></tr>
+        </thead>
+        <tbody>
+          {% for title, easy, complete, overall in ratings %}
+          <tr>
+            <td>{{ title }}</td>
+            <td>{{ "%.1f"|format(easy or 0) }}</td>
+            <td>{{ "%.1f"|format(complete or 0) }}</td>
+            <td>{{ "%.1f"|format(overall or 0) }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-muted">No ratings yet</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Quiz Performance -->
+  <div class="card mb-4">
+    <div class="card-header bg-success text-white">Quiz Performance</div>
+    <div class="card-body">
+      <table class="table table-hover">
+        <thead>
+          <tr><th>Title</th><th>Average Score</th></tr>
+        </thead>
+        <tbody>
+          {% for title, score in quizzes %}
+          <tr><td>{{ title }}</td><td>{{ "%.1f"|format(score or 0) }}%</td></tr>
+          {% else %}
+          <tr><td colspan="2" class="text-muted">No quiz data</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

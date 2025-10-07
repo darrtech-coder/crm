@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>{{ test.title }}</h2>
+
+  <!-- Progress bar -->
+  <div class="progress mb-2">
+    <div class="progress-bar" id="progressBar" style="width:0%"></div>
+  </div>
+
+  <p class="text-muted mb-2" id="progressText">Question 1 of {{ test.questions|length }}</p>
+
+  <form id="testForm" method="POST" enctype="multipart/form-data">
+    <div id="questionContainer" class="card shadow-sm p-4 mb-3">Loading question …</div>
+
+    <div class="d-flex justify-content-between">
+      <button type="button" class="btn btn-secondary" id="prevBtn" disabled>⬅ Back</button>
+      <button type="button" class="btn btn-primary" id="nextBtn">Next ➡</button>
+      <button type="submit" class="btn btn-success d-none" id="submitBtn">Finish Test</button>
+    </div>
+  </form>
+</div>
+
+<script>
+const autosaved = {{ autosaved|tojson }};
+const testId = {{ test.id }};
+let current = 1;
+let total = {{ test.questions|length }};
+let answers = autosaved || {};
+
+
+
+
+// let answers = autosaved || {};
+
+
+
+function loadQuestion(){
+  fetch(`/tests/${testId}/question/${current}`)
+    .then(r => r.json())
+    .then(data => { 
+        if (!data || data.error){ 
+            document.getElementById("questionContainer").innerText = "Question unavailable."; 
+            return; 
+        }
+        renderQuestion(data);
+    })
+    .catch(err => {
+        console.error("Fetch error:", err);
+        document.getElementById("questionContainer").innerText = "Error loading question.";
+    });
+}
+
+function renderQuestion(q){
+  document.getElementById("progressText").innerText = `Question ${q.index} of ${q.total}`;
+  document.getElementById("progressBar").style.width = `${(q.index/q.total)*100}%`;
+  let html = `<h5>${q.question}</h5>`;
+
+  // --- Media preview ---
+  if(q.media){
+    const m = q.media.toLowerCase();
+    const path = `/tests/media/${encodeURIComponent(q.media)}`;
+    if(m.match(/\.(mp4|mov|webm|avi|mkv)$/)){
+      html += `<video controls width="100%" class="rounded my-2"><source src="${path}" type="video/mp4"></video>`;
+    } else if(m.match(/\.(mp3|wav|ogg)$/)){
+      html += `<audio controls class="w-100 mb-2"><source src="${path}"></audio>`;
+    } else if(m.match(/\.(jpg|jpeg|png|gif|webp)$/)){
+      html += `<img src="${path}" class="img-fluid rounded my-2">`;
+    } else {
+      html += `<a href="${path}" target="_blank" class="btn btn-outline-secondary btn-sm mb-2">📎 Open Media File</a>`;
+    }
+  }
+
+  // --- Question types ---
+  if (q.type === "mcq") {
+    q.options.forEach(opt => {
+      const checked = (answers[q.id] == opt.id) ? "checked" : "";
+      html += `<div class="form-check">
+                 <input class="form-check-input" type="radio" name="q${q.id}"
+                        value="${opt.id}" ${checked}
+                        id="opt${opt.id}">
+                 <label class="form-check-label" for="opt${opt.id}">${opt.text}</label>
+               </div>`;
+    });
+  } else if (q.type === "short_text") {
+    const prev = answers[q.id] || "";
+    html += `<textarea class="form-control" rows="3" name="q${q.id}">${prev}</textarea>`;
+  } else if (q.type === "audio") {
+    html += `
+      <div class="border rounded p-3 bg-light">
+        <label class="form-label fw-bold">Record or Upload Audio Answer 🎤</label>
+        <div class="d-flex flex-wrap align-items-center gap-2 my-2">
+          <button type="button" class="btn btn-outline-primary btn-sm recBtn" data-qid="${q.id}">Record</button>
+          <button type="button" class="btn btn-outline-danger btn-sm stopBtn" data-qid="${q.id}" disabled>Stop</button>
+          <audio id="play${q.id}" controls class="d-none" style="width:260px;"></audio>
+          <input type="hidden" name="recorded_audio_${q.id}" id="recField${q.id}">
+        </div>
+        <p class="small text-muted mb-1">— or upload an audio file —</p>
+        <input type="file" class="form-control form-control-sm" name="q${q.id}" accept="audio/*">
+      </div>`;
+  }
+
+  document.getElementById("questionContainer").innerHTML = html;
+
+  // Initialize recorder controls if this is an audio question
+  if (q.type === "audio") initRecorder(q.id);
+
+  // Navigation buttons
+  document.getElementById("prevBtn").disabled = (current <= 1);
+  const nextBtn = document.getElementById("nextBtn");
+  const submitBtn = document.getElementById("submitBtn");
+  if (current < total){
+    nextBtn.classList.remove("d-none");
+    submitBtn.classList.add("d-none");
+  } else {
+    nextBtn.classList.add("d-none");
+    submitBtn.classList.remove("d-none");
+  }
+}
+
+// --- Initialize recorder safely ---
+function initRecorder(qid){
+  const recBtn = document.querySelector(`.recBtn[data-qid="${qid}"]`);
+  const stopBtn = document.querySelector(`.stopBtn[data-qid="${qid}"]`);
+  const playback = document.getElementById(`play${qid}`);
+  const field = document.getElementById(`recField${qid}`);  
+  if (!navigator.mediaDevices){ recBtn.disabled = true; return; }
+  
+  let recorder, chunks = [];
+  recBtn.addEventListener("click", async ()=>{
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    recorder = new MediaRecorder(stream,{mimeType:"audio/webm"});
+    chunks = [];
+    recorder.ondataavailable = e => chunks.push(e.data);
+    recorder.onstop = ()=>{
+      const blob = new Blob(chunks,{type:"audio/webm"});
+      const url = URL.createObjectURL(blob);
+      playback.src = url;
+      playback.classList.remove("d-none");
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        const base64 = reader.result.split(",")[1];
+        field.value = base64;
+      };
+      reader.readAsDataURL(blob);
+    };
+    recorder.start();
+    recBtn.disabled = true; stopBtn.disabled = false;
+  });
+  stopBtn.addEventListener("click", ()=>{
+    if(recorder){ recorder.stop(); }
+    recBtn.disabled = false; stopBtn.disabled = true;
+  });
+}
+
+// --- helper to save current answer ---
+function saveCurrentAnswer(){
+  const inputs = document.querySelectorAll("#questionContainer input, #questionContainer textarea");
+  inputs.forEach(el=>{
+    if(el.type==="radio" && el.checked)
+      answers[parseInt(el.name.substring(1))] = parseInt(el.value);
+    else if(el.tagName==="TEXTAREA" && el.value.trim())
+      answers[parseInt(el.name.substring(1))] = el.value.trim();
+  });
+}
+
+
+
+// --- submit ---
+document.getElementById("testForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  saveCurrentAnswer();
+  for(const [qid,val] of Object.entries(answers)){
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = `q${qid}`;
+    input.value = val;
+    e.target.appendChild(input);
+  }
+  e.target.submit();
+});
+
+
+
+loadQuestion();
+
+
+//-----------------------------------------------------------
+//  TIMER  +  AUTOSAVE
+//-----------------------------------------------------------
+let totalSeconds = {{ test.time_limit or 0 }} * 60 || 20*60;  // default 20 min
+let timerInterval = null;
+let autosaveInterval = null;
+
+function startTimer(){
+  updateClock();
+  timerInterval = setInterval(()=>{
+    totalSeconds--;
+    updateClock();
+    if(totalSeconds <= 0){
+      clearInterval(timerInterval);
+      clearInterval(autosaveInterval);
+      alert("Time is up! Submitting your test…");
+      document.getElementById("testForm").submit();
+    }
+  },1000);
+}
+
+function updateClock(){
+  const m = String(Math.floor(totalSeconds/60)).padStart(2,"0");
+  const s = String(totalSeconds%60).padStart(2,"0");
+  const el = document.getElementById("progressText");
+  el.innerHTML = `${el.textContent.split("–")[0]} – ⏰ ${m}:${s}`;
+}
+
+//----- AUTOSAVE every 30 s -----
+function autoSave(){
+  const payload = { answers: answers };
+  fetch(`/tests/${testId}/autosave`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(payload)
+  })
+  .then(r=>r.json())
+  .then(d=>console.log("Autosaved at", d.saved_at))
+  .catch(err=>console.warn("Autosave failed", err));
+}
+
+function startAutosave(){
+  autosaveInterval = setInterval(()=>{
+    saveCurrentAnswer();
+    autoSave();
+  }, 10000); // 30 s
+}
+
+// ============================================================
+// 🔸 NAVIGATION BUTTONS  (with immediate autosave)
+// ============================================================
+document.getElementById("nextBtn").addEventListener("click", () => {
+  saveCurrentAnswer();
+  autoSave();            // 👈 immediate autosave on NEXT
+  if (current < total) {
+    current++;
+    loadQuestion();
+  }
+});
+
+document.getElementById("prevBtn").addEventListener("click", () => {
+  saveCurrentAnswer();
+  autoSave();            // 👈 immediate autosave on BACK
+  if (current > 1) {
+    current--;
+    loadQuestion();
+  }
+});
+
+
+
+// Kick‑off once first question loads
+loadQuestion();
+startTimer();
+startAutosave();
+</script>
+{% endblock %}

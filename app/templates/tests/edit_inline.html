@@ -1,0 +1,362 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Edit / Design Test: {{ test.title }}</h2>
+
+  <!-- === Test Metadata === -->
+  <form method="POST">
+    <div class="mb-3">
+      <label class="form-label">Title</label>
+      <input class="form-control" name="title" value="{{ test.title }}">
+    </div>
+    <div class="mb-3">
+      <label>Description</label>
+      <textarea name="description" rows="3" class="form-control">{{ test.description }}</textarea>
+    </div>
+    <button class="btn btn-primary mb-3">Save Metadata</button>
+  </form>
+
+
+
+<hr>
+<h5>Prerequisite Tests</h5>
+
+<form method="POST"
+      action="{{ url_for('tests.add_prerequisite', test_id=test.id) }}"
+      class="mb-3" id="prereqForm">
+  <div class="input-group mb-2 position-relative">
+    <input class="form-control" id="prereqSearch" name="prereq"
+           placeholder="Search test by title…" autocomplete="off" required>
+    <ul class="list-group position-absolute w-100 shadow-sm"
+        id="prereqResults"
+        style="max-height:150px;overflow-y:auto;z-index:1000;display:none;"></ul>
+    <button class="btn btn-success">Add Prerequisite</button>
+  </div>
+  <div class="form-text text-muted">Maximum of two (2) Tests</div>
+</form>
+
+
+<!-- === Current Prerequisites === -->
+<table class="table table-sm table-bordered mt-3">
+  <thead>
+    <tr>
+      <th>Prerequisite Test</th>
+      <th>Added On</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for pre in test.prerequisites %}
+      <tr>
+        <td>
+          <a href="{{ url_for('tests.edit', test_id=pre.prereq_test_id) }}" target="_blank">
+            {{ pre.prereq_test.title }}
+          </a>
+        </td>
+        <td>{{ pre.created_at.strftime("%Y‑%m‑%d %H:%M") }}</td>
+        <td class="text-end">
+          <form method="POST"
+                action="{{ url_for('tests.delete_prerequisite', test_id=test.id, pid=pre.id) }}"
+                style="display:inline"
+                onsubmit="return confirm('Remove {{ pre.prereq_test.title }} as a prerequisite?');">
+            <button class="btn btn-sm btn-outline-danger">Remove</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="3" class="text-muted">No prerequisite tests set yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<hr>
+<h5>Linked Courses</h5>
+
+<form method="POST" action="{{ url_for('tests.add_course_req', test_id=test.id) }}" class="mb-3" id="linkCourseForm">
+  <div class="mb-2 position-relative">
+    <label class="form-label">Search and Add Course</label>
+    <input class="form-control" name="q" id="courseSearch" placeholder="Type course title…" autocomplete="off" required>
+    <!-- autocompletion results -->
+    <ul class="list-group position-absolute w-100 shadow-sm" id="courseResults"
+        style="max-height:200px;overflow-y:auto;z-index:1000;display:none;"></ul>
+  </div>
+
+  <div class="input-group mb-3">
+    <select class="form-select" name="type">
+      <option value="suggested">Suggested</option>
+      <option value="recommended">Recommended</option>
+      <option value="required">Required</option>
+    </select>
+    <button class="btn btn-success">Add</button>
+  </div>
+</form>
+
+<table class="table table-sm table-bordered">
+  <thead><tr><th>Course</th><th>Type</th><th></th></tr></thead>
+  <tbody>
+    {% for req in test.requirements %}
+    <tr>
+      <td>
+        <a href="{{ url_for('library.view_item', item_id=req.course_id) }}" target="_blank">
+          {{ req.course.title }}
+        </a>
+      </td>
+      <td class="text-capitalize">{{ req.requirement_type }}</td>
+      <td>
+        <form method="POST"
+              action="{{ url_for('tests.delete_course_req', req_id=req.id, test_id=test.id) }}"
+              style="display:inline">
+          <button class="btn btn-sm btn-outline-danger">Remove</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+      <tr><td colspan="3" class="text-muted">No linked courses yet</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+
+
+  <hr/>
+
+  <div class="d-flex justify-content-between align-items-center">
+    <h4>Questions</h4>
+    <a class="btn btn-outline-info"
+       href="{{ url_for('tests.review_submissions', test_id=test.id) }}">
+       Review Submissions
+    </a>
+  </div>
+
+  {% if test.questions %}
+  {% for q in test.questions %}
+  <div class="card shadow-sm p-3 mb-3">
+    <form method="POST" enctype="multipart/form-data"
+          action="{{ url_for('tests.edit_question', qid=q.id) }}">
+      <strong>Q{{ loop.index }} ({{ q.type|capitalize }})</strong>
+
+      {% if q.media_path %}
+      <div class="mb-3 mt-2 p-2 border rounded bg-light">
+        <p class="mb-1 text-muted">Attached Media:</p>
+        {% set ext = q.media_path.lower() %}
+        {% if ext.endswith(('.mp4','.webm','.mov','.mkv')) %}
+          <video controls width="240" class="rounded mb-2">
+            <source src="{{ url_for('tests.question_media', filename=q.media_path) }}" type="video/mp4">
+          </video>
+        {% elif ext.endswith(('.mp3','.wav','.ogg')) %}
+          <audio controls class="w-100 mb-2">
+            <source src="{{ url_for('tests.question_media', filename=q.media_path) }}">
+          </audio>
+        {% elif ext.endswith(('.jpg','.jpeg','.png','.gif','.webp')) %}
+          <img src="{{ url_for('tests.question_media', filename=q.media_path) }}" class="img-fluid rounded mb-2" style="max-width:240px;">
+        {% else %}
+          <a href="{{ url_for('tests.question_media', filename=q.media_path) }}" target="_blank">{{ q.media_path }}</a>
+        {% endif %}
+        <div>
+          <a href="{{ url_for('tests.question_media', filename=q.media_path) }}" target="_blank" class="btn btn-sm btn-outline-primary me-2">View Media</a>
+          <button type="submit" name="delete_media" value="1" class="btn btn-sm btn-outline-danger">Remove Media</button>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="mb-3">
+        <label class="form-label">Replace / Add Media</label>
+        <input type="file" class="form-control" name="media" accept="video/*,audio/*,image/*,application/pdf">
+        <small class="form-text text-muted">Upload a new file to replace existing media (optional).</small>
+      </div>
+
+      <textarea name="question" class="form-control my-2" rows="2">{{ q.question }}</textarea>
+
+      {% if q.type == "mcq" %}
+      <div id="optwrap{{ q.id }}">
+        {% for opt in q.options %}
+        <div class="input-group mb-2">
+          <input class="form-control" name="option" value="{{ opt.text }}">
+          <span class="input-group-text">
+            <input type="checkbox" name="is_correct" {% if opt.is_correct %}checked{% endif %}> ✅
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addOpt({{ q.id }})">+ Add Option</button>
+      {% endif %}
+
+      <div class="mt-3">
+        <button class="btn btn-success btn-sm">Save Changes</button>
+        <button formaction="{{ url_for('tests.delete_question', qid=q.id) }}" formmethod="POST"
+                class="btn btn-sm btn-outline-danger"
+                onclick="return confirm('Delete this question?');">Delete</button>
+      </div>
+    </form>
+  </div>
+  {% endfor %}
+  {% else %}
+  <p class="text-muted mt-3">No questions yet.</p>
+  {% endif %}
+
+  <hr/>
+  <h5 class="mt-4">Add New Question</h5>
+
+  <!-- ======= dynamic Add Question form ======= -->
+  <form id="addQuestionsForm" method="POST" enctype="multipart/form-data"
+        action="{{ url_for('tests.add_questions_bulk', test_id=test.id) }}">
+    <div id="questionContainer"></div>
+    <button type="button" id="addBlock" class="btn btn-outline-secondary mt-2">+ Add Question Block</button>
+    <button type="submit" class="btn btn-success mt-2">💾 Save New Questions</button>
+  </form>
+</div>
+
+<script>
+let qIndex = 0;
+
+function questionBlockHTML(i) {
+  return `
+  <div class="border rounded p-3 mb-3" id="block${i}">
+    <div class="row mb-2">
+      <div class="col-md-3">
+        <label>Type</label>
+        <select name="type" class="form-select" onchange="toggleBlock(${i}, this.value)">
+          <option value="mcq" selected>Multiple Choice</option>
+          <option value="short_text">Short Text</option>
+          <option value="audio">Audio</option>
+        </select>
+      </div>
+    </div>
+
+    <label>Question Text</label>
+    <textarea name="question" class="form-control mb-2" rows="2" required></textarea>
+
+    <div class="mb-3">
+      <label class="form-label">Optional Video / Media</label>
+      <input type="file" class="form-control" name="media"
+             accept="video/*,audio/*,image/*,application/pdf">
+      <small class="form-text text-muted">Attach a short clip for context (optional).</small>
+    </div>
+
+    <div class="option-section" id="opts${i}">
+      <h6>Options</h6>
+      <div id="optwrap${i}"></div>
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addOpt(${i})">+ Add Option</button>
+    </div>
+
+    <button type="button" class="btn btn-sm btn-outline-danger mt-2" onclick="removeBlock(${i})">Remove Block</button>
+  </div>`;
+}
+
+function addBlock() {
+  const container = document.getElementById("questionContainer");
+  container.insertAdjacentHTML("beforeend", questionBlockHTML(qIndex));
+  addOpt(qIndex);
+  qIndex++;
+}
+
+function removeBlock(i) {
+  const el = document.getElementById(`block${i}`);
+  if (el) el.remove();
+}
+
+function toggleBlock(i, type) {
+  const section = document.getElementById(`opts${i}`);
+  if (section) section.style.display = (type === "mcq") ? "block" : "none";
+}
+
+function addOpt(id) {
+  const wrap = document.getElementById(`optwrap${id}`);
+  if (!wrap) return;
+  const div = document.createElement("div");
+  div.className = "input-group mb-2";
+  div.innerHTML = `
+     <input class="form-control" name="option" placeholder="Option text">
+     <span class="input-group-text"><input type="checkbox" name="is_correct"> ✅</span>`;
+  wrap.appendChild(div);
+}
+
+// initialise handlers
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("addBlock").addEventListener("click", addBlock);
+});
+
+
+/* =========================================================
+   🔍 Live Course Search / Autocomplete
+   ========================================================= */
+const searchBox   = document.getElementById("courseSearch");
+const resultsList = document.getElementById("courseResults");
+
+searchBox.addEventListener("input", ()=> {
+  const q = searchBox.value.trim();
+  if (q.length < 2){ resultsList.style.display="none"; return; }
+
+  fetch(`/tests/search_courses?q=${encodeURIComponent(q)}`)
+    .then(r => r.json())
+    .then(data => {
+      resultsList.innerHTML="";
+      if(!data.length){ resultsList.style.display="none"; return; }
+
+      data.forEach(item=>{
+        const li = document.createElement("li");
+        li.className="list-group-item list-group-item-action";
+        li.textContent=item.title;
+        li.dataset.value=item.title;
+        li.addEventListener("click",()=>{
+          searchBox.value=item.title;
+          resultsList.style.display="none";
+        });
+        resultsList.appendChild(li);
+      });
+      resultsList.style.display="block";
+    })
+    .catch(err=>console.error("Autocomplete fetch error:", err));
+});
+
+// hide dropdown when clicking elsewhere
+document.addEventListener("click", e=>{
+  if(!resultsList.contains(e.target) && e.target !== searchBox){
+      resultsList.style.display="none";
+  }
+});
+
+
+/* =========================================================
+   🔍 Live Test Search / Autocomplete for Prerequisites
+   ========================================================= */
+const testBox   = document.getElementById("prereqSearch");
+const testList  = document.getElementById("prereqResults");
+
+if (testBox) {
+  testBox.addEventListener("input", () => {
+    const q = testBox.value.trim();
+    if (q.length < 2) { testList.style.display = "none"; return; }
+
+    fetch(`/tests/search_tests?q=${encodeURIComponent(q)}&current_id={{ test.id }}`)
+      .then(r => r.json())
+      .then(data => {
+        testList.innerHTML = "";
+        if (!data.length) { testList.style.display = "none"; return; }
+
+        data.forEach(item => {
+          const li = document.createElement("li");
+          li.className = "list-group-item list-group-item-action";
+          li.textContent = item.title;
+          li.addEventListener("click", () => {
+            testBox.value = item.title;
+            testList.style.display = "none";
+          });
+          testList.appendChild(li);
+        });
+        testList.style.display = "block";
+      })
+      .catch(err => console.error("Autocomplete fetch error:", err));
+  });
+
+  // hide dropdown when clicking outside
+  document.addEventListener("click", e => {
+    if (!testList.contains(e.target) && e.target !== testBox)
+      testList.style.display = "none";
+  });
+}
+
+
+
+</script>
+{% endblock %}

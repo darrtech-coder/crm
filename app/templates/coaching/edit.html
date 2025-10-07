@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block content %}
+
+<a href="{{ url_for('coaching.list_plans') }}" class="btn btn-secondary mb-3">&larr; Back to Plans</a>
+
+<div class="container mt-4">
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Edit Coaching Plan</h2>
+        <form method="POST"
+              action="{{ url_for('coaching.delete_plan', plan_id=plan.id) }}"
+              onsubmit="return confirm('Delete this plan permanently?');">
+          <button type="submit" class="btn btn-danger">🗑 Delete</button>
+        </form>
+      </div>
+
+      <form method="POST">
+        <!-- Title -->
+        <div class="mb-3">
+          <label class="form-label">Title</label>
+          <input type="text" class="form-control" name="title"
+                 value="{{ plan.title }}" required>
+        </div>
+
+        <!-- Description -->
+        <div class="mb-3">
+          <label class="form-label">Description</label>
+          <textarea name="description" rows="3"
+                    class="form-control">{{ plan.description }}</textarea>
+        </div>
+
+        <!-- Due Date -->
+        <div class="mb-3">
+          <label class="form-label">Due Date</label>
+          <input type="date" name="due_date"
+                 value="{{ plan.due_date.strftime('%Y-%m-%d') if plan.due_date }}"
+                 class="form-control">
+          <small class="text-muted">Default is 7 days from creation if left blank.</small>
+        </div>
+
+        <!-- Pass mark -->
+        <div class="mb-3">
+          <label class="form-label">Pass Mark (%)</label>
+          <input type="number" name="pass_percent" min="0" max="100"
+                 value="{{ plan.pass_percent or 60 }}" class="form-control">
+        </div>
+
+        <!-- Assignment -->
+        <div class="mb-3">
+          <label class="form-label">Assign To</label>
+          <div class="input-group">
+            <input type="number" name="assigned_to" class="form-control"
+                   value="{{ plan.assigned_to or '' }}" placeholder="User ID (optional)">
+            <span class="input-group-text">or</span>
+            <select class="form-select" name="team_id">
+              <option value="">-- Assign to Team --</option>
+              {% for t in teams %}
+              <option value="{{ t.id }}" {% if plan.team_id==t.id %}selected{% endif %}>{{ t.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Attached Library Courses -->
+        <div class="mb-3 position-relative">
+          <label>Search & Attach Library Items</label>
+          <input class="form-control" id="courseSearch" placeholder="Type to search library…">
+          <ul class="list-group position-absolute w-100 shadow-sm"
+              id="courseResult"
+              style="z-index:10;max-height:200px;overflow-y:auto;display:none;"></ul>
+          <input type="hidden" name="items" id="courseId">
+          {% if plan.library_items %}
+            <div class="mt-2 small text-muted">
+              Currently linked: {{ plan.library_items|length }} item(s)
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- Attach Tests -->
+        <div class="mb-3 position-relative">
+          <label>Attach Tests</label>
+          <input class="form-control" id="testSearch" placeholder="Search tests…">
+          <ul class="list-group position-absolute w-100 shadow-sm"
+              id="testResult"
+              style="z-index:10;max-height:200px;overflow-y:auto;display:none;"></ul>
+          <input type="hidden" name="tests" id="testId">
+          {% if plan.tests %}
+            <div class="mt-2 small text-muted">
+              Linked tests: {{ plan.tests|length }}
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="d-grid mt-4">
+          <button class="btn btn-primary btn-lg">💾 Save Changes</button>
+        </div>
+      </form>
+
+      <hr class="my-4">
+
+      <!-- Progress link -->
+      <div class="d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Monitor Progress</h5>
+        <a href="{{ url_for('coaching.plan_progress', plan_id=plan.id) }}"
+           class="btn btn-outline-success">📊 View Progress</a>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+function enableAutocomplete(inputId, url, hiddenInputId, listId){
+  const input=document.getElementById(inputId);
+  const list=document.getElementById(listId);
+  const hidden=document.getElementById(hiddenInputId);
+
+  input.addEventListener("input", ()=>{
+    const q=input.value.trim();
+    if(q.length<2){ list.style.display="none"; return;}
+    fetch(`${url}?q=${encodeURIComponent(q)}`)
+      .then(r=>r.json())
+      .then(data=>{
+        list.innerHTML="";
+        if(!data.length){ list.style.display="none"; return;}
+        data.forEach(row=>{
+          const li=document.createElement("li");
+          li.className="list-group-item list-group-item-action";
+          li.textContent=row.title;
+          li.addEventListener("click",()=>{
+            input.value=row.title;
+            hidden.value=row.id;
+            list.style.display="none";
+          });
+          list.appendChild(li);
+        });
+        list.style.display="block";
+      });
+  });
+}
+
+enableAutocomplete("courseSearch","/coaching/search_courses","courseId","courseResult");
+enableAutocomplete("testSearch","/coaching/search_tests","testId","testResult");
+</script>
+
+{% endblock %}

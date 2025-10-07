@@ -1,0 +1,27 @@
+{% for lead in leads %}
+<tr>
+  <td>{{ lead.name }}</td>
+  <td>{{ lead.phone }}</td>
+  <td>{{ lead.email }}</td>
+  <td>{{ lead.status }}</td>
+  <td>{{ lead.review_status }}</td>
+  <td>
+    {% if current_user.role in ("MANAGER","ADMIN","SUPER_ADMIN") %}
+      <form method="POST" action="{{ url_for('leads.review', lead_id=lead.id) }}" class="d-flex gap-2">
+        <select name="review_status" class="form-select form-select-sm">
+          <option value="pending" {{ 'selected' if lead.review_status=='pending' }}>Pending</option>
+          <option value="good" {{ 'selected' if lead.review_status=='good' }}>Good</option>
+          <option value="bad" {{ 'selected' if lead.review_status=='bad' }}>Bad</option>
+          <option value="need_callback" {{ 'selected' if lead.review_status=='need_callback' }}>Need Callback</option>
+        </select>
+        <select name="status" class="form-select form-select-sm">
+          <option value="open" {{ 'selected' if lead.status=='open' }}>Open</option>
+          <option value="pending" {{ 'selected' if lead.status=='pending' }}>Pending</option>
+          <option value="closed" {{ 'selected' if lead.status=='closed' }}>Closed</option>
+        </select>
+        <button class="btn btn-sm btn-primary">Update</button>
+      </form>
+    {% endif %}
+  </td>
+</tr>
+{% endfor %}

@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Take Test: {{ test.title }}</h2>
+
+  <form method="POST" enctype="multipart/form-data">
+    {% for q in test.questions %}
+      <div class="card mb-4 shadow-sm p-3">
+        <h5 class="mb-2">{{ loop.index }}.&nbsp;{{ q.question }}</h5>
+
+        {# 🎞️ Display linked media if present #}
+        {% if q.media_path %}
+          <div class="mb-3 border rounded p-2 bg-light text-center">
+            {% set fname = q.media_path.lower() %}
+            {% if fname.endswith(('.mp4','.mov','.avi','.mkv','.webm')) %}
+              <video controls width="100%" class="rounded">
+                <source src="{{ url_for('tests.question_media', filename=q.media_path) }}" type="video/mp4">
+                Your browser does not support video tag.
+              </video>
+            {% elif fname.endswith(('.mp3','.wav','.ogg')) %}
+              <audio controls class="w-100 mt-2">
+                <source src="{{ url_for('tests.question_media', filename=q.media_path) }}">
+                Your browser does not support audio tag.
+              </audio>
+            {% elif fname.endswith(('.png','.jpg','.jpeg','.gif','.webp')) %}
+              <img src="{{ url_for('tests.question_media', filename=q.media_path) }}" 
+                   alt="Question media" class="img-fluid rounded my-2">
+            {% else %}
+              <a href="{{ url_for('tests.question_media', filename=q.media_path) }}"
+                 class="btn btn-outline-secondary btn-sm" target="_blank">
+                📎 Open attached file
+              </a>
+            {% endif %}
+          </div>
+        {% endif %}
+
+        {# --- Question types --- #}
+        {% if q.type == "mcq" %}
+          {% for opt in q.options %}
+            <div class="form-check">
+              <input class="form-check-input" type="radio" id="q{{q.id}}opt{{opt.id}}" 
+                     name="q{{ q.id }}" value="{{ opt.id }}">
+              <label class="form-check-label" for="q{{q.id}}opt{{opt.id}}">{{ opt.text }}</label>
+            </div>
+          {% endfor %}
+
+        {% elif q.type == "short_text" %}
+          <textarea class="form-control" name="q{{ q.id }}" rows="3"
+                    placeholder="Enter your answer…"></textarea>
+
+        {% elif q.type == "audio" %}
+          <div class="mb-3 p-2 border rounded bg-light">
+            <label><strong>Record or Upload Audio Answer:</strong></label>
+            <div class="d-flex flex-wrap align-items-center gap-3 my-2">
+              <button type="button" class="btn btn-outline-primary btn-sm" id="recBtn{{ q.id }}">🎤 Record</button>
+              <button type="button" class="btn btn-outline-danger btn-sm" id="stopBtn{{ q.id }}" disabled>⏹️ Stop</button>
+              <audio id="play{{ q.id }}" controls class="d-none" style="width:260px;"></audio>
+              <input type="hidden" name="recorded_audio_{{ q.id }}" id="recField{{ q.id }}">
+            </div>
+
+            <p class="small text-muted mb-1">— or —</p>
+            <input type="file" class="form-control form-control-sm" name="q{{ q.id }}" accept="audio/*">
+          </div>
+
+          <script>
+          (function(){
+            let recorder, chunks=[];
+            const recBtn=document.getElementById("recBtn{{ q.id }}");
+            const stopBtn=document.getElementById("stopBtn{{ q.id }}");
+            const playback=document.getElementById("play{{ q.id }}");
+            const field=document.getElementById("recField{{ q.id }}");
+
+            if(!navigator.mediaDevices){recBtn.disabled=true;return;}
+
+            recBtn.addEventListener("click", async ()=>{
+              const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+              recorder=new MediaRecorder(stream,{mimeType:"audio/webm"});
+              recorder.start();chunks=[];
+              recorder.ondataavailable=e=>chunks.push(e.data);
+              recorder.onstop=()=>{
+                const blob=new Blob(chunks,{type:"audio/webm"});
+                const url=URL.createObjectURL(blob);
+                playback.src=url;playback.classList.remove("d-none");
+                const reader=new FileReader();
+                reader.onload=()=>{
+                  const base64=reader.result.split(",")[1];
+                  field.value=base64;
+                };
+                reader.readAsDataURL(blob);
+              };
+              recBtn.disabled=true;stopBtn.disabled=false;
+            });
+            stopBtn.addEventListener("click",()=>{
+              recorder.stop();recBtn.disabled=false;stopBtn.disabled=true;
+            });
+          })();
+          </script>
+        {% endif %}
+      </div>
+    {% endfor %}
+
+    <div class="text-center">
+      <button class="btn btn-success btn-lg px-5">Submit Test</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

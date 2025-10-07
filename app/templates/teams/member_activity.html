@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>📈 Activity Summary – {{ user.username }}</h2>
+  <ul class="nav nav-tabs" id="activityTabs" role="tablist">
+    <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#week">This Week</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#month">This Month</a></li>
+  </ul>
+
+  <div class="tab-content p-3 border border-top-0">
+    <div id="week" class="tab-pane fade show active">
+      <canvas id="loginChart" height="120"></canvas>
+      <canvas id="studyChart" height="120"></canvas>
+    </div>
+    <div id="month" class="tab-pane fade">
+      <canvas id="monthChart" height="120"></canvas>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const loginLabels = {{ weekly_labels|tojson }};
+const loginCounts = {{ weekly_logins|tojson }};
+const studyTime = {{ weekly_time|tojson }};
+const monthLabels = {{ monthly_labels|tojson }};
+const monthTotals = {{ monthly_hours|tojson }};
+
+// Weekly Logins
+new Chart(document.getElementById('loginChart'), {
+  type: 'bar',
+  data:{labels:loginLabels, datasets:[{
+    label:'Logins',
+    data:loginCounts,
+    backgroundColor:'steelblue'
+  }]},
+  options:{scales:{y:{beginAtZero:true}}}
+});
+
+// Weekly Study Time
+new Chart(document.getElementById('studyChart'), {
+  type: 'line',
+  data:{labels:loginLabels, datasets:[{
+    label:'Study Time (hours)',
+    data:studyTime,
+    borderColor:'green',
+    tension:0.3,
+    fill:false
+  }]},
+  options:{scales:{y:{beginAtZero:true}}}
+});
+
+// Monthly Totals
+new Chart(document.getElementById('monthChart'), {
+  type:'bar',
+  data:{labels:monthLabels, datasets:[{
+    label:'Total Study Hours',
+    data:monthTotals,
+    backgroundColor:'orange'
+  }]},
+  options:{scales:{y:{beginAtZero:true}}}
+});
+</script>
+{% endblock %}

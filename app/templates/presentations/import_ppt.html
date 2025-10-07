@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<a href="{{ url_for('presentations.index') }}" class="btn btn-secondary mb-3">&larr; Back</a>
+<h2>📥 Import PowerPoint</h2>
+
+<form method="POST" enctype="multipart/form-data" class="card p-3 shadow-sm">
+  <div class="mb-3">
+    <label class="form-label">Title</label>
+    <input type="text" class="form-control" name="title" required>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Upload File (.pptx or .ppt)</label>
+    <input type="file" name="pptx" class="form-control" accept=".ppt,.pptx,pptm" required>
+  </div>
+
+  <div class="form-check">
+    <input class="form-check-input" type="checkbox" name="reverse" id="reverse">
+    <label for="reverse" class="form-check-label">Reverse order (Notes → Client)</label>
+  </div>
+
+  <div class="form-check">
+    <input class="form-check-input" type="checkbox" name="skip_notes" id="skip_notes">
+    <label for="skip_notes" class="form-check-label">Skip agent notes</label>
+  </div>
+
+  <div class="form-check mb-3">
+    <input type="checkbox" class="form-check-input" name="restricted_to_managers" id="restricted_to_managers">
+    <label class="form-check-label" for="restricted_to_managers">Manager-only Presentation</label>
+  </div>
+
+  <button type="submit" class="btn btn-success mt-3">Import</button>
+</form>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const fileInput = document.querySelector('input[type="file"]');
+  const titleInput = document.querySelector('input[name="title"]');
+
+  if (fileInput && titleInput) {
+    fileInput.addEventListener("change", function() {
+      if (this.files.length > 0) {
+        const fileName = this.files[0].name;
+        const baseName = fileName.replace(/\.[^/.]+$/, ""); // strip extension
+        // Only populate if the Title field is empty
+        if (!titleInput.value.trim()) {
+          titleInput.value = baseName;
+        }
+      }
+    });
+  }
+});
+</script>
+
+{% endblock %}

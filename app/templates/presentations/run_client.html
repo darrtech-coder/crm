@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Client View - {{ presentation.title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    body,html {margin:0;height:100%;}
+    #themeToggle {
+      position: fixed;
+      top: 10px; right: 10px;
+      z-index: 9999;
+    }
+
+body.light {
+  background: #f8f9fa;
+  color: #212529;
+}
+body.dark {
+  background: #1e1e1e;
+  color: #ddd;
+}
+  </style>
+</head>
+<body class="bg-light {{ current_user.theme if current_user.is_authenticated else 'light' }}">
+<button id="themeToggle" class="btn btn-sm btn-secondary">🌙 Dark/Light</button>
+<div id="client-slide" class="slide light"></div>
+
+<script>
+let currentTheme = "light";
+
+document.getElementById("themeToggle").addEventListener("click", ()=>{
+  const slideDiv = document.getElementById("client-slide");
+  slideDiv.classList.remove(currentTheme);
+  currentTheme = (currentTheme === "light" ? "dark" : "light");
+  slideDiv.classList.add(currentTheme);
+});
+
+function poll(){
+ fetch("{{ url_for('presentations.current', pres_id=presentation.id) }}")
+  .then(r=>r.json())
+  .then(d=>{
+    if(d.id){
+      document.getElementById("client-slide").innerHTML=d.client_content;
+    }
+  });
+}
+setInterval(poll, 1500);
+</script>
+</body>
+</html>

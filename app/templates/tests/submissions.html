@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Submissions for "{{ test.title }}"</h2>
+  <table class="table table-striped align-middle">
+    <thead>
+      <tr><th>User</th><th>Submitted</th><th>Score</th><th>Action</th></tr>
+    </thead>
+    <tbody>
+    {% for s in submissions %}
+      <tr>
+        <td>{{ s.user.username }}</td>
+        <td>{{ s.submitted_at.strftime("%Y-%m-%d %H:%M") }}</td>
+        <td>{{ "%.1f"|format(s.score or 0) }}</td>
+        <td>
+          <a class="btn btn-sm btn-outline-primary"
+             href="{{ url_for('tests.grade_submission', submission_id=s.id) }}">
+             Grade / Review
+          </a>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4" class="text-muted">No submissions yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <a href="{{ url_for('tests.edit', test_id=test.id) }}"
+     class="btn btn-secondary">← Back to Test</a>
+</div>
+{% endblock %}

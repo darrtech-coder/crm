@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card shadow-lg border-0 rounded-lg mt-5">
+      <div class="card-body p-4">
+        <h3 class="text-center mb-4">First-time Setup</h3>
+        <p class="text-muted text-center">Create the initial <strong>Super Admin</strong> account to manage the system.</p>
+        <form method="POST">
+          <div class="mb-3">
+            <label class="form-label">Super Admin Email</label>
+            <input class="form-control" type="email" name="email" placeholder="Email address" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Username</label>
+            <input class="form-control" type="text" name="username" placeholder="Choose a username" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Password</label>
+            <input class="form-control" type="password" name="password" placeholder="Enter a password" required>
+          </div>
+          <div class="d-grid">
+            <button type="submit" class="btn btn-success">Create Super Admin</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>📑 Tests</h2>
+  {% if current_user.role in ("MANAGER","ADMIN","SUPER_ADMIN") %}
+    <a class="btn btn-success mb-3" href="{{ url_for('tests.create') }}">+ Create Test</a>
+  {% endif %}
+
+  <ul class="list-group">
+    {% for t in tests %}
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      <span><strong>{{ t.title }}</strong> – {{ t.description or "" }}</span>
+      <span>
+        <a href="{{ url_for('tests.ready', test_id=t.id) }}" class="btn btn-primary btn-sm">Take</a>
+        {% if current_user.role in ("MANAGER","ADMIN","SUPER_ADMIN") %}
+          <a href="{{ url_for('tests.edit', test_id=t.id) }}" class="btn btn-warning btn-sm">Edit</a>
+          <a href="{{ url_for('tests.review_submissions', test_id=t.id) }}" class="btn btn-info btn-sm">Submissions</a>
+
+{% if t.status != 'archived' %}
+<form method="POST" action="{{ url_for('tests.archive_test', test_id=t.id) }}" class="d-inline">
+  <button class="btn btn-sm btn-outline-warning">Archive</button>
+</form>
+{% else %}
+<form method="POST" action="{{ url_for('tests.restore_test', test_id=t.id) }}" class="d-inline">
+  <button class="btn btn-sm btn-outline-success">Restore</button>
+</form>
+{% endif %}
+
+        {% endif %}
+
+<a href="{{ url_for('tests.test_result', test_id=t.id) }}" class="btn btn-outline-success btn-sm">
+  View Results
+</a>
+
+      </span>
+    </li>
+    {% else %}
+    <li class="list-group-item text-muted">No tests yet</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

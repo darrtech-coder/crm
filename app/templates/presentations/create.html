@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Create Presentation</h2>
+<form method="POST" enctype="multipart/form-data">
+  <div class="mb-3">
+    <label>Title</label>
+    <input class="form-control" name="title">
+  </div>
+  <h4>Upload PowerPoint (optional)</h4>
+  <input type="file" name="pptx" accept=".pptx" class="form-control mb-3">
+  
+<!-- Restrict Access -->
+<div class="form-check mb-3">
+  <input type="checkbox" class="form-check-input" name="restricted_to_managers"
+         {% if presentation and presentation.restricted_to_managers %}checked{% endif %}>
+  <label class="form-check-label">Manager-only Presentation</label>
+</div>
+<div class="mb-3">
+  <label class="form-label">Restrict to Teams</label>
+  <select name="team_ids" class="form-select" multiple>
+    {% for t in teams %}
+      <option value="{{ t.id }}"
+        {% if presentation and (t.id in presentation.access_rules|map(attribute='team_id')|list) %}selected{% endif %}>
+        {{ t.name }}
+      </option>
+    {% endfor %}
+  </select>
+</div>
+<input type="text" class="form-control mb-3" name="user_ids" placeholder="Comma-separated user IDs">
+
+  <h4>Manual Slides</h4>
+  <div id="slides">
+    <div class="card p-3 mb-3">
+      <h5>Slide 1</h5>
+      Client:<textarea class="tinymce" name="client_content"></textarea>
+      Notes:<textarea class="tinymce" name="agent_notes"></textarea>
+    </div>
+  </div>
+  <button type="button" class="btn btn-secondary" onclick="addSlide()">+ Add Slide</button>
+
+
+<div class="form-check mb-3">
+  <input type="checkbox" class="form-check-input" name="restricted_to_managers" id="restricted_to_managers">
+  <label class="form-check-label" for="restricted_to_managers">Manager-only Presentation</label>
+</div>
+
+  <button class="btn btn-success mt-3">Create</button>
+</form>
+
+<script>
+let slideCount = 2;
+function addSlide(){
+  let container = document.getElementById("slides");
+  let card = document.createElement("div");
+  card.className = "card p-3 mb-3";
+  card.innerHTML = `<h5>Slide ${slideCount}</h5>
+                    <label>Client View:</label>
+                    <textarea class="tinymce" name="client_content"></textarea>
+                    <label>Agent Notes:</label>
+                    <textarea class="tinymce" name="agent_notes"></textarea>`;
+  container.appendChild(card);
+  tinymce.init({  selector: '.tinymce',
+  plugins: 'lists link media table image code',
+  toolbar: 'undo redo | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | code',
+  height: 300,
+  automatic_uploads: true,
+  images_upload_url: '/presentations/upload_media',
+  file_picker_types: 'image media',
+  file_picker_callback: function(callback, value, meta) {
+    // Open Media Manager in a popup
+    let win = window.open('/presentations/media_manager', 'Media Manager', 'width=800,height=600');
+    window.addEventListener('message', function(event){
+      if(event.data.fileUrl){ callback(event.data.fileUrl); win.close(); }
+    });
+  },
+	  license_key: 'gpl' });
+  slideCount++;
+}
+</script>
+{% endblock %}

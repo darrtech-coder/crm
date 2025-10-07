@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Teams</h2>
+
+  {% if current_user.role in ("MANAGER", "ADMIN", "SUPER_ADMIN") %}
+    <a href="{{ url_for('teams.create') }}" class="btn btn-primary mb-3">+ Create Team</a>
+  {% endif %}
+
+  {% for team in teams %}
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5>
+  <a href="{{ url_for('teams.detail', team_id=team.id) }}">
+    {{ team.name }}
+  </a>
+</h5>
+        {% if current_user.role in ("ADMIN","SUPER_ADMIN") %}
+          <form action="{{ url_for('teams.delete_team', team_id=team.id) }}" method="post"
+                onsubmit="return confirm('Delete team {{ team.name }}?');">
+            <button class="btn btn-sm btn-danger">Delete Team</button>
+          </form>
+        {% endif %}
+      </div>
+
+      <div class="card-body">
+        <h6>Members</h6>
+        <ul class="list-group">
+          {% for member in team.teammember_set %}
+            <li class="list-group-item d-flex justify-content-between">
+              <span>{{ member.user.username }} ({{ member.role }})</span>
+              {% if current_user.role in ("ADMIN","SUPER_ADMIN") or
+                    (current_user.role=="MANAGER" and member.role=="AGENT") %}
+                <form action="{{ url_for('teams.remove_member', team_id=team.id, user_id=member.user.id) }}"
+                      method="post" style="display:inline;">
+                  <button class="btn btn-sm btn-outline-danger">Remove</button>
+                </form>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+
+        {% if current_user.role in ("ADMIN","SUPER_ADMIN") or current_user.role=="MANAGER" %}
+          <hr>
+<form action="{{ url_for('teams.add_member', team_id=team.id) }}" method="post" class="row g-2">
+  <div class="col-md-5">
+    <select name="user_id" class="form-select" required>
+      <option value="">-- Select User --</option>
+      {% for u in users %}
+        <option value="{{ u.id }}">{{ u.username }} ({{ u.email }})</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-4">
+    <select name="role" class="form-select">
+      <option value="AGENT">Agent</option>
+      {% if current_user.role in ("ADMIN","SUPER_ADMIN") %}
+      <option value="MANAGER">Manager</option>
+      {% endif %}
+    </select>
+  </div>
+  <div class="col-md-3">
+    <button type="submit" class="btn btn-success w-100">Add Member</button>
+  </div>
+</form>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

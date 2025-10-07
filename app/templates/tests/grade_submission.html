@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Grade Submission — {{ submission.user.username }}</h2>
+  <p class="text-muted">
+     Test: {{ submission.test.title }} |
+     Submitted: {{ submission.submitted_at.strftime("%Y-%m-%d %H:%M") }}
+  </p>
+
+  <form method="POST">
+    {% for ans in submission.answers %}
+      <div class="card mb-3 p-3 shadow-sm">
+        <h5>Q{{ loop.index }}. {{ ans.question.question }}</h5>
+        <p><small class="text-muted">{{ ans.question.type|capitalize }}</small></p>
+
+{% if ans.question.media_path %}
+
+
+  {% set ext = ans.question.media_path.lower() %}
+  <div class="my-2">
+    {% if ext.endswith(('.mp4','.mov','.webm','.mkv')) %}
+
+      <video controls width="320">
+        <source src="{{ url_for('tests.question_media', filename=ans.question.media_path) }}" type="video/mp4">
+      </video>
+    {% elif ext.endswith(('.mp3','.wav','.ogg')) %}
+
+      <audio controls class="w-100 mt-2">
+        <source src="{{ url_for('tests.question_media', filename=ans.question.media_path) }}">
+      </audio>
+    {% elif ext.endswith(('.jpg','.jpeg','.png','.gif','.webp')) %}
+<p>image</p>
+      <img src="{{ url_for('tests.question_media', filename=ans.question.media_path) }}" width="200">
+    {% else %}
+
+      <a href="{{ url_for('tests.question_media', filename=ans.question.media_path) }}"
+         target="_blank">📎 {{ ans.question.media_path }}</a>
+    {% endif %}
+  </div>
+{% endif %}
+
+
+        {% if ans.question.type == 'mcq' %}
+          <ul>
+            {% for opt in ans.question.options %}
+              <li {% if opt.id == ans.selected_option %}class="fw-bold"{% endif %}>
+                {{ opt.text }}
+                {% if opt.is_correct %}
+                  <span class="badge bg-success">Correct</span>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+          <div>
+            {% if ans.is_correct %}
+              <span class="badge bg-success">🟢 5 / 5</span>
+            {% else %}
+              <span class="badge bg-danger">🔴 0 / 5</span>
+            {% endif %}
+          </div>
+
+        {% elif ans.question.type == 'short_text' %}
+          <div class="border p-2 bg-light">
+            <strong>Response:</strong><br>{{ ans.answer_text or "— none —" }}
+          </div>
+          <div class="mt-2">
+            <label>Mark (0–5):</label>
+            <input type="number" step="0.1" min="0" max="5"
+                   name="q_{{ ans.id }}"
+                   value="{{ ans.score or '' }}"
+                   class="form-control w-auto d-inline-block">
+          </div>
+
+        {% elif ans.question.type == 'audio' %}
+          {% if ans.answer_audio %}
+<audio controls>
+  <source src="{{ url_for('presentations.media_file', filename='audio_answers/' ~ ans.answer_audio) }}">
+</audio>
+          {% else %}
+            <p class="text-muted">— no audio uploaded —</p>
+          {% endif %}
+          <div class="mt-2">
+            <label>Mark (0–5):</label>
+            <input type="number" step="0.1" min="0" max="5"
+                   name="q_{{ ans.id }}"
+                   value="{{ ans.score or '' }}"
+                   class="form-control w-auto d-inline-block">
+          </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+
+    <button type="submit" class="btn btn-success">Save Grades</button>
+    <a href="{{ url_for('tests.review_submissions', test_id=submission.test.id) }}"
+       class="btn btn-secondary">Cancel</a>
+  </form>
+</div>
+{% endblock %}
