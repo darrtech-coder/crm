@@ -41,7 +41,7 @@ git commit -m "%COMMIT_MSG%" || echo (Skipped commit if nothing new)
 :: Rename branch and push
 git branch -M %BRANCH%
 echo Pushing to GitHub...
-git push -u origin %BRANCH%
+git push -u origin %BRANCH% --force
 
 echo.
 echo ✅ All done! Files uploaded successfully.
