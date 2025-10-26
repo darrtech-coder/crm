@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+    /* Styles for reactions and emoji picker */
+    /* --- [FIX] Add position: relative to the message container --- */
+    .message-container {
+        position: relative;
+    }
+    .message-reactions {
+        display: flex;
+        gap: 4px;
+        margin-top: 4px;
+    }
+    .reaction-badge {
+        background-color: #e9ecef;
+        border: 1px solid #dee2e6;
+        border-radius: 12px;
+        padding: 2px 8px;
+        font-size: 0.8em;
+        cursor: pointer;
+    }
+    .reaction-badge.user-reacted {
+        background-color: #cfe2ff;
+        border-color: #9ec5fe;
+    }
+    .add-reaction-btn {
+        opacity: 0;
+        transition: opacity 0.2s;
+        cursor: pointer;
+    }
+    .message-container:hover .add-reaction-btn {
+        opacity: 1;
+    }
+    emoji-picker {
+        position: absolute;
+        /* --- [TWEAK] Adjust position to be above the button --- */
+        right: 20px;
+        bottom: 30px; /* Adjust this value as needed */
+        z-index: 100;
+    }
+</style>
+
+<div class="container mt-4">
+  <h2>Chat Room {{ room_id }}</h2>
+  <a href="{{ url_for('messaging.rooms') }}" class="btn btn-secondary mb-3">&larr; Back to Rooms</a>
+
+  <div class="row">
+    <!-- Sidebar with teammates -->
+    <div class="col-md-3">
+      <h5>Teammates</h5>
+      <ul class="list-group" id="teammates-list">
+        {% for mate in teammates if mate.id != current_user.id %}
+        <li class="list-group-item d-flex justify-content-between align-items-center" id="mate-{{mate.id}}">
+          <span>{{ mate.username }} <span class="badge bg-secondary status">…</span></span>
+          <a href="{{ url_for('messaging.create_direct', user_id=mate.id) }}" class="btn btn-sm btn-outline-primary">Message</a>
+        </li>
+        {% else %}
+        <li class="list-group-item">No teammates found</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <!-- Messages + form -->
+    <div class="col-md-9">
+      <!-- Messages list -->
+      <div class="mb-3 border p-3 bg-light" style="height:400px; overflow-y:auto;" id="messages-box">
+        <p class="text-muted">Loading messages…</p>
+      </div>
+
+      <!-- Send message -->
+      <form id="sendForm" class="mt-2">
+        <div class="input-group">
+          <input type="text" class="form-control" id="msgContent" placeholder="Type a message..." required>
+          <button type="button" class="btn btn-outline-secondary" id="emojiBtn">🙂</button>
+          <button class="btn btn-primary" type="submit">Send</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const messagesBox = document.getElementById("messages-box");
+    const sendForm = document.getElementById("sendForm");
+    const msgContent = document.getElementById("msgContent");
+    const emojiBtn = document.getElementById('emojiBtn');
+    let picker; // emoji picker instance
+
+    // --- Presence ---
+    function pollPresence() {
+        fetch("{{ url_for('messaging.presence') }}")
+            .then(r => r.json().catch(() => []))
+            .then(data => {
+                data.forEach(u => {
+                    let el = document.querySelector("#mate-" + u.id + " .status");
+                    if (el) {
+                        if (u.status == "online") {
+                            el.className = "badge bg-success";
+                            el.innerText = "online";
+                        } else {
+                            el.className = "badge bg-secondary";
+                            el.innerText = u.last_seen ? `seen ${u.last_seen}` : "offline";
+                        }
+                    }
+                });
+            });
+    }
+
+    // --- Messages ---
+    function loadMessages() {
+        fetch("{{ url_for('messaging.room_messages', room_id=room_id) }}")
+            .then(r => r.json().catch(() => []))
+            .then(data => {
+                const wasScrolledBottom = messagesBox.scrollHeight - messagesBox.clientHeight <= messagesBox.scrollTop + 1;
+                messagesBox.innerHTML = "";
+                if (data.length === 0) {
+                    messagesBox.innerHTML = "<p class='text-muted'>No messages yet. Say hi 👋</p>";
+                    return;
+                }
+                data.forEach(m => {
+                    let div = document.createElement("div");
+                    div.className = "mb-2 message-container";
+                    div.dataset.messageId = m.id;
+
+                    let reactionsHTML = '<div class="message-reactions">';
+                    for (const [emoji, reaction] of Object.entries(m.reactions)) {
+                        const userReactedClass = reaction.users.includes({{ current_user.id }}) ? 'user-reacted' : '';
+                        reactionsHTML += `<span class="reaction-badge ${userReactedClass}" data-emoji="${emoji}" title="${reaction.usernames.join(', ')}">
+                                            ${emoji} ${reaction.count}
+                                          </span>`;
+                    }
+                    reactionsHTML += '</div>';
+
+                    // Construct the image URL on the client-side
+                    const badgesHTML = m.badges.map(b => 
+                        `<img src="/static/badges/${b.image_file}" width="16" height="16" title="${b.name}">`
+                    ).join(' ');
+
+                    div.innerHTML = `
+                        <div>
+                            <strong>${m.sender}:</strong>
+                            ${badgesHTML}
+                            <small class="text-muted">(${m.time})</small>
+                            <span class="add-reaction-btn" title="Add Reaction">🙂</span>
+                        </div>
+                        <div>${m.content}</div>
+                        ${reactionsHTML}
+                    `;
+                    messagesBox.appendChild(div);
+                });
+
+                if (wasScrolledBottom) {
+                    messagesBox.scrollTop = messagesBox.scrollHeight;
+                }
+            });
+    }
+
+    // --- Reactions & Emoji Picker ---
+    function react(messageId, emoji) {
+        const formData = new FormData();
+        formData.append('emoji', emoji);
+        fetch(`/messaging/react/${messageId}`, {
+                method: "POST",
+                body: new URLSearchParams(formData)
+            })
+            .then(() => loadMessages());
+    }
+    
+    function toggleEmojiPicker(target, messageId = null) {
+        if (picker && picker.parentElement) {
+            picker.remove();
+            return;
+        }
+        picker = document.createElement('emoji-picker');
+        picker.addEventListener('emoji-click', event => {
+            if (messageId) { // Reacting to a message
+                react(messageId, event.detail.unicode);
+                if (picker) picker.remove();
+            } else { // Adding to input field
+                msgContent.value += event.detail.unicode;
+            }
+        });
+        
+        if (messageId) {
+            target.closest('.message-container').appendChild(picker);
+        } else {
+            // Position picker relative to the form
+            sendForm.parentElement.style.position = 'relative';
+            sendForm.parentElement.appendChild(picker);
+        }
+    }
+
+    // --- Event Listeners ---
+    sendForm.addEventListener("submit", function(e) {
+        e.preventDefault();
+        const content = msgContent.value;
+        if (!content.trim()) return;
+
+        fetch("{{ url_for('messaging.send_message', room_id=room_id) }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: "content=" + encodeURIComponent(content)
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === "ok") {
+                    msgContent.value = "";
+                    if (picker) picker.remove();
+                    loadMessages();
+                } else {
+                    alert("Error: " + data.message);
+                }
+            });
+    });
+    
+    messagesBox.addEventListener('click', function(e) {
+        const messageContainer = e.target.closest('.message-container');
+        if (!messageContainer) return;
+        
+        const messageId = messageContainer.dataset.messageId;
+
+        if (e.target.classList.contains('add-reaction-btn')) {
+            toggleEmojiPicker(e.target, messageId);
+        }
+        
+        if (e.target.classList.contains('reaction-badge')) {
+            const emoji = e.target.dataset.emoji;
+            react(messageId, emoji);
+        }
+    });
+
+    if (emojiBtn) {
+        emojiBtn.addEventListener('click', () => toggleEmojiPicker(emojiBtn));
+    }
+
+    // --- Initial Load & Intervals ---
+    pollPresence();
+    loadMessages();
+    setInterval(pollPresence, 5000);
+    setInterval(loadMessages, 3000);
+});
+</script>
+{% endblock %}

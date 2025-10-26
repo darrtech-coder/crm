@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4 text-center">
+    <div class="card shadow-sm mx-auto" style="max-width: 600px;">
+        <div class="card-body p-5">
+            {% if is_complete %}
+                <h1 class="display-4 text-success">🎉</h1>
+                <h2 class="card-title">Congratulations!</h2>
+                <p class="lead">You have completed the course:</p>
+            {% else %}
+                <h1 class="display-4 text-info">🏁</h1>
+                <h2 class="card-title">Course Finished</h2>
+                <p class="lead">You have reached the end of the course:</p>
+            {% endif %}
+
+            <h3 class="my-3">"{{ course.title }}"</h3>
+
+            {% if not is_complete %}
+            <div class="alert alert-warning">
+                You have finished all modules, but some requirements may not be met.
+                You have completed {{ completed_modules }} of {{ total_modules }} modules.
+            </div>
+            {% endif %}
+
+            <div class="d-grid gap-2 d-sm-flex justify-content-sm-center mt-4">
+                <a href="{{ url_for('academy.course_view', course_id=course.id) }}" class="btn btn-primary btn-lg">Review Course</a>
+                <a href="{{ url_for('academy.index') }}" class="btn btn-outline-secondary btn-lg">Back to Academy</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

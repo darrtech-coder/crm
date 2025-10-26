@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Search Presentations</h2>
+  <form method="GET">
+    <input class="form-control mb-3" type="text" name="q" value="{{ q }}" placeholder="Search title or content">
+  </form>
+  <ul class="list-group">
+  {% for p in results %}
+    <li class="list-group-item">
+      <a href="{{ url_for('presentations.run_agent', pres_id=p.id) }}">{{ p.title }}</a>
+    </li>
+  {% else %}
+    <li class="list-group-item text-muted">No results</li>
+  {% endfor %}
+  </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Team: {{ team.name }}</h2>
+
+  <!-- Back Button -->
+  <a href="{{ url_for('teams.index') }}" class="btn btn-secondary mb-3">&larr; Back to Teams</a>
+
+  <h4>Members</h4>
+  <table class="table table-striped">
+    <thead>
+      <tr><th>Username</th><th>Email</th><th>Role</th><th>Joined</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+      {% for member in members %}
+      <tr>
+        <td>{{ member.user.username }}</td>
+        <td>{{ member.user.email }}</td>
+        <td>{{ member.role }}</td>
+        <td>{{ member.user.created_at | tz("%Y-%m-%d") }}</td>
+        <td>
+          {% if current_user.role in ("ADMIN","SUPER_ADMIN") or
+                (current_user.role=="MANAGER" and member.role=="AGENT") %}
+            <form action="{{ url_for('teams.remove_member', team_id=team.id, user_id=member.user.id) }}"
+                  method="post" style="display:inline;">
+              <button class="btn btn-sm btn-outline-danger">Remove</button>
+            </form>
+          {% endif %}
+        </td>
+<td>
+  {% if current_user.role in ("ADMIN","SUPER_ADMIN","MANAGER") %}
+    <a href="{{ url_for('teams.member_activity', user_id=member.user.id) }}"
+       class="btn btn-sm btn-outline-primary">
+       Activity
+    </a>
+  {% endif %}
+</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if current_user.role in ("MANAGER","ADMIN","SUPER_ADMIN") %}
+  <hr>
+  <h4>Send Team Notice</h4>
+  <form action="{{ url_for('messaging.send_team_notice', team_id=team.id) }}" method="post">
+    <div class="mb-3">
+      <textarea name="content" class="form-control" rows="3" placeholder="Write a notice for this team..." required></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Send Notice</button>&nbsp;&nbsp;<a href="{{ url_for('messaging.room', room_id=room.id) }}" class="btn btn-info">Open Team Chat</a>
+  </form>
+
+<br/>
+
+  {% endif %}
+
+</div>
+{% endblock %}

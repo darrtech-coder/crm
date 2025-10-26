@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+  <a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary mb-3">&larr; Back</a>
+<div class="container mt-4">
+  <h2>Log Entry #{{ log.id }}</h2>
+  <table class="table table-bordered w-auto">
+    <tr><th>Timestamp</th><td>{{ log.timestamp|tz("%Y-%m-%d %H:%M %Z") }}</td></tr>
+    <tr><th>Event</th><td>{{ log.event_type }}</td></tr>
+    <tr><th>User ID</th><td>{{ log.user_id or "-" }}</td></tr>
+    <tr><th>Email/Username</th><td>{{ log.email_or_username }}</td></tr>
+    <tr><th>IP</th><td>{{ log.ip }}</td></tr>
+    <tr><th>User Agent</th><td class="small">{{ log.user_agent }}</td></tr>
+    <tr><th>Path</th><td>{{ log.path }}</td></tr>
+    <tr><th>Flagged</th><td>{{ "Yes" if log.flagged else "No" }}</td></tr>
+  </table>
+  <a href="{{ url_for('dashboard.super_admin_logs') }}" class="btn btn-secondary">← Back</a>
+</div>
+{% endblock %}

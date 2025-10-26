@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4 text-center">
+  <h2 class="mb-4">Manager Dashboard</h2>
+  <div class="row justify-content-center">
+
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('dashboard.users') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-person-fill display-6 d-block mb-2 text-primary"></i>
+        Users
+      </a>
+    </div> 
+
+    <!-- Teams -->
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('teams.index') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-people-fill display-6 d-block mb-2 text-primary"></i>
+        My Teams
+      </a>
+    </div>
+
+    <!-- Leads -->
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('leads.index') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-person-lines-fill display-6 d-block mb-2 text-success"></i>
+        Team Leads
+      </a>
+    </div>
+
+    <!-- Library Upload -->
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('library.upload') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-journal-plus display-6 d-block mb-2 text-info"></i>
+        Upload Knowledge
+      </a>
+    </div>
+
+    <!-- Library -->
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('library.index') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-journal-bookmark-fill display-6 d-block mb-2 text-secondary"></i>
+        Library
+      </a>
+    </div>
+
+
+<div class="col-md-3 mb-3">
+  <a href="{{ url_for('academy.index') }}" class="btn btn-light w-100 py-3 shadow-sm">
+    <i class="bi bi-mortarboard-fill display-6 d-block mb-2 text-primary"></i>
+    Academy
+  </a>
+</div>
+<div class="col-md-3 mb-3">
+  <a href="{{ url_for('academy.admin_index') }}" class="btn btn-light w-100 py-3 shadow-sm">
+    <i class="bi bi-gear display-6 d-block mb-2 text-secondary"></i>
+    Manage Academy
+  </a>
+</div>
+
+    <!-- Messaging -->
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('messaging.rooms') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-chat-dots-fill display-6 d-block mb-2 text-warning"></i>
+        Team Chat
+      </a>
+    </div>
+
+    <!-- Presentations -->
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('presentations.index') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-easel-fill display-6 d-block mb-2 text-danger"></i>
+        Presentations
+      </a>
+    </div>
+
+    <!-- Media Manager -->
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('presentations.media_manager') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-folder-fill display-6 d-block mb-2 text-secondary"></i>
+        Media Manager
+      </a>
+    </div>
+
+    <!-- Coaching -->
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('coaching.list_plans') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-lightbulb-fill display-6 d-block mb-2 text-success"></i>
+        Coaching Planner
+      </a>
+    </div>
+
+
+<div class="col-md-3 mb-3">
+  <a href="{{ url_for('tests.index') }}" class="btn btn-light w-100 py-3 shadow-sm">
+    <i class="bi bi-check2-square display-6 d-block mb-2 text-info"></i>
+    Tests / Assessments
+  </a>
+</div>
+
+    <!-- Manage Team Users -->
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('dashboard.manager_users') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-person-badge-fill display-6 d-block mb-2 text-dark"></i>
+        Manage My Team Users
+      </a>
+    </div>
+
+    <!-- Notifications -->
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('dashboard.unread_notifications') }}" class="btn btn-light w-100 py-3 shadow-sm position-relative">
+        <i class="bi bi-bell-fill display-6 d-block mb-2 text-danger"></i>
+        Notifications
+        <span id="notifBadge"
+              class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+          0
+        </span>
+      </a>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// 🔔 Live refresh of notification count
+function updateNotifBadge(){
+  fetch("{{ url_for('notifications.poll') }}")
+    .then(r => r.json())
+    .then(data => {
+      const badge = document.getElementById("notifBadge");
+      badge.innerText = data.length;
+      badge.style.display = (data.length > 0) ? "inline" : "none";
+    });
+}
+document.addEventListener("DOMContentLoaded", updateNotifBadge);
+setInterval(updateNotifBadge, 10000); // every 10s
+</script>
+{% endblock %}

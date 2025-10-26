@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% block content %}
+  <a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary mb-3">&larr; Back</a>
+
+<div class="container mt-4">
+  <div class="row">
+    <!-- Sidebar -->
+    <div class="col-md-3">
+      <h5>Categories</h5>
+      <ul class="list-group">
+        <li class="list-group-item {% if current_cat == 'all' %}active{% endif %}">
+          <a class="text-decoration-none text-reset" href="{{ url_for('library.index') }}">All</a>
+        </li>
+        {% for cat in categories %}
+        <li class="list-group-item {% if current_cat == cat.id %}active{% endif %}">
+          <a class="text-decoration-none text-reset"
+             href="{{ url_for('library.index', category=cat.id) }}">{{ cat.name }}</a>
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted">No categories yet</li>
+        {% endfor %}
+  <li class="list-group-item {% if current_cat == "none" %}active{% endif %}">
+    <a class="text-decoration-none text-reset" href="{{ url_for('library.index', category="none") }}">Uncategorized</a>
+  </li>
+      </ul>
+
+      {% if current_user.role in ("ADMIN","SUPER_ADMIN") %}
+      <a href="{{ url_for('library.manage_categories') }}" 
+         class="btn btn-sm btn-outline-secondary mt-2 w-100">Manage Categories</a>
+      {% endif %}
+
+      {% if current_user.role in ("MANAGER","ADMIN","SUPER_ADMIN") %}
+      <a href="{{ url_for('library.upload') }}" 
+         class="btn btn-sm btn-success mt-2 w-100">+ Upload Item</a>
+      {% endif %}
+
+      {% if current_user.role in ("ADMIN","SUPER_ADMIN") %}
+      <a href="{{ url_for('library.archived_items') }}" 
+         class="btn btn-sm btn-outline-warning mt-2 w-100">Archived Items</a>
+      {% endif %}
+    </div>
+
+    <!-- Main Content -->
+    <div class="col-md-9">
+
+      <h2 class="mb-3">Knowledge Library</h2>
+
+      <!-- Search box -->
+      <form method="GET" class="mb-4">
+        <div class="input-group">
+          <input class="form-control" name="q" value="{{ q }}" placeholder="Search by title, keywords, content">
+          <button type="submit" class="btn btn-outline-primary">Search</button>
+        </div>
+      </form>
+
+      <!-- 🔎 Search Results -->
+      {% if q %}
+        <h4>Search Results for "<em>{{ q }}</em>"</h4>
+        {% if items %}
+          <div class="row">
+            {% for item in items %}
+            <div class="col-md-4 mb-4">
+              <div class="card h-100 shadow-sm">
+                {% if item.thumbnail %}
+                  <img src="{{ url_for('library.download_item', item_id=item.id, thumb=1) }}?thumb=1" class="card-img-top" alt="thumb">
+                {% else %}
+                  <img src="{{ url_for('static', filename='img/default-thumb.png') }}" class="card-img-top" alt="default-thumb">
+                {% endif %}
+
+
+<div class="card-body">
+  <h6 class="card-title text-truncate">
+    {{ item.title }}
+    {% if item.manager_only %}
+      <span class="badge bg-danger ms-1">🔒 Manager Only</span>
+    {% endif %}
+    {% if item.restricted_access %}
+      <span class="badge bg-warning ms-1">🔒 Restricted</span>
+    {% endif %}
+    {% if item.trending_entries %}
+      <span class="badge bg-success ms-1">⭐ Highlighted</span>
+    {% endif %}
+  </h6>
+  <p class="card-text text-truncate small">{{ item.description }}</p>
+  <a href="{{ url_for('library.view_item', item_id=item.id) }}" class="btn btn-sm btn-primary">View</a>
+
+  {% if current_user.role in ["ADMIN","SUPER_ADMIN"] %}
+    {% if not item.trending_entries %}
+      <form method="POST" action="{{ url_for('library.mark_trending', item_id=item.id) }}" class="d-inline">
+        <button class="btn btn-sm btn-outline-warning">⭐ Highlight</button>
+      </form>
+    {% else %}
+      <form method="POST" action="{{ url_for('library.unmark_trending', item_id=item.id) }}" class="d-inline">
+        <button class="btn btn-sm btn-outline-secondary">❌ Unhighlight</button>
+      </form>
+    {% endif %}
+  {% endif %}
+    
+  {% if item.category %}
+    <span class="badge bg-info float-end">{{ item.category.name }}</span>
+  {% endif %}
+</div>
+
+
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted">No results found for your search.</p>
+        {% endif %}
+        <hr>
+      {% endif %}
+
+<!-- Pagination Controls -->
+{% if pagination.pages > 1 %}
+<nav>
+  <ul class="pagination">
+    {% if pagination.has_prev %}
+      <li class="page-item"><a class="page-link" href="{{ url_for('library.index', page=pagination.prev_num, per_page=per_page, category=current_cat, q=q) }}">&laquo;</a></li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
+    {% endif %}
+    
+    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+        <li class="page-item {% if p == pagination.page %}active{% endif %}">
+          <a class="page-link" href="{{ url_for('library.index', page=p, per_page=per_page, category=current_cat, q=q) }}">{{ p }}</a>
+        </li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link">…</span></li>
+      {% endif %}
+    {% endfor %}
+    
+    {% if pagination.has_next %}
+      <li class="page-item"><a class="page-link" href="{{ url_for('library.index', page=pagination.next_num, per_page=per_page, category=current_cat, q=q) }}">&raquo;</a></li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+
+<!-- Per Page Selector -->
+<form method="get" class="mt-2">
+  <input type="hidden" name="category" value="{{ current_cat }}">
+  <input type="hidden" name="q" value="{{ q }}">
+  <label class="me-2">Items per page:</label>
+  <select name="per_page" onchange="this.form.submit()">
+    {% for option in [6,12,24,48] %}
+      <option value="{{ option }}" {% if per_page == option %}selected{% endif %}>{{ option }}</option>
+    {% endfor %}
+  </select>
+</form>
+
+      <!-- 📂 Category Results -->
+      {% if current_cat and not q %}
+        {% set cat_title = categories|selectattr("id","equalto",current_cat)|first %}
+        <h4>Category: {{ cat_title.name if cat_title else "Selected" }}</h4>
+        {% if items %}
+          <div class="row">
+            {% for item in items %}
+            <div class="col-md-4 mb-4">
+              <div class="card h-100 shadow-sm">
+                {% if item.thumbnail %}
+                  <img src="{{ url_for('library.download_item', item_id=item.id) }}?thumb=1" class="card-img-top" alt="thumb">
+                {% else %}
+                  <img src="{{ url_for('static', filename='img/default-thumb.png') }}" class="card-img-top" alt="default-thumb">
+                {% endif %}
+
+<div class="card-body">
+  <h6 class="card-title text-truncate">
+    {{ item.title }}
+    {% if item.manager_only %}
+      <span class="badge bg-danger ms-1">🔒 Manager Only</span>
+    {% endif %}
+    {% if item.restricted_access %}
+      <span class="badge bg-warning ms-1">🔒 Restricted</span>
+    {% endif %}
+    {% if item.trending_entries %}
+      <span class="badge bg-success ms-1">⭐ Highlighted</span>
+    {% endif %}
+  </h6>
+  <p class="card-text text-truncate small">{{ item.description }}</p>
+  <a href="{{ url_for('library.view_item', item_id=item.id) }}" class="btn btn-sm btn-primary">View</a>
+
+  {% if current_user.role in ["ADMIN","SUPER_ADMIN"] %}
+    {% if not item.trending_entries %}
+      <form method="POST" action="{{ url_for('library.mark_trending', item_id=item.id) }}" class="d-inline">
+        <button class="btn btn-sm btn-outline-warning">⭐ Highlight</button>
+      </form>
+    {% else %}
+      <form method="POST" action="{{ url_for('library.unmark_trending', item_id=item.id) }}" class="d-inline">
+        <button class="btn btn-sm btn-outline-secondary">❌ Unhighlight</button>
+      </form>
+    {% endif %}
+  {% endif %}
+    
+  {% if item.category %}
+    <span class="badge bg-info float-end">{{ item.category.name }}</span>
+  {% endif %}
+</div>
+
+
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted">No items in this category.</p>
+        {% endif %}
+        <hr>
+      {% endif %}
+
+      <!-- Suggested -->
+      <h4>Suggested for you</h4>
+      <div class="row">
+        {% for item,score in suggested %}
+        <div class="col-md-3 mb-4">
+          <div class="card h-100 shadow-sm">
+            {% if item.thumbnail %}
+              <img src="{{ url_for('library.download_item', item_id=item.id) }}?thumb=1" class="card-img-top" alt="thumb">
+            {% else %}
+              <img src="{{ url_for('static', filename='img/default-thumb.png') }}" class="card-img-top" alt="default-thumb">
+            {% endif %}
+            <div class="card-body">
+              <h6 class="card-title text-truncate">
+                {{ item.title }}
+                {% if item.manager_only %}
+                  <span class="badge bg-danger ms-1">🔒</span>
+                {% endif %}
+                {% if item.restricted_access %}
+                  <span class="badge bg-warning ms-1">🔒</span>
+                {% endif %}
+              </h6>
+              <a href="{{ url_for('library.view_item', item_id=item.id) }}" class="stretched-link"></a>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <p class="text-muted">No personalised suggestions yet</p>
+        {% endfor %}
+      </div>
+
+      <hr>
+
+      <!-- System Trending -->
+      <h4>Trending (Most Viewed)</h4>
+      <ul>
+        {% for item,views in system_trending %}
+          <li>
+            <a href="{{ url_for('library.view_item', item_id=item.id) }}">{{ item.title }}</a>
+            {% if item.manager_only %}
+              <span class="badge bg-danger">🔒</span>
+            {% endif %}
+            {% if item.restricted_access %}
+              <span class="badge bg-warning">🔒</span>
+            {% endif %}
+            <span class="badge bg-secondary">{{ views }} views</span>
+          </li>
+        {% else %}
+          <p class="text-muted">No trending data</p>
+        {% endfor %}
+      </ul>
+
+      <!-- Admin/manual trending -->
+      <h4>Highlighted by Admin</h4>
+      <ul>
+        {% for item in manual_trending %}
+          <li>
+            <a href="{{ url_for('library.view_item', item_id=item.id) }}">{{ item.title }}</a>
+            {% if item.manager_only %}<span class="badge bg-danger">🔒</span>{% endif %}
+            {% if item.restricted_access %}<span class="badge bg-warning">🔒</span>{% endif %}
+          </li>
+        {% else %}
+          <p class="text-muted">No highlights</p>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

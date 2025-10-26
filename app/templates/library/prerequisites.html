@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm border-warning">
+        <div class="card-header bg-warning text-dark">
+            <h3><i class="bi bi-lock-fill"></i> Prerequisite Required</h3>
+        </div>
+        <div class="card-body">
+            <h5 class="card-title">You must complete the following item(s) before you can view "{{ item.title }}":</h5>
+            
+            <ul class="list-group mt-3">
+                {% for prereq in prerequisites %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>{{ prereq.prereq_item.title }}</span>
+                        <a href="{{ url_for('library.view_item', item_id=prereq.prereq_item.id) }}" class="btn btn-primary">
+                            Go to Prerequisite &rarr;
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="list-group-item text-muted">Prerequisite information is unavailable.</li>
+                {% endfor %}
+            </ul>
+            
+            <div class="mt-4">
+                <a href="{{ back_url(default_endpoint='library.index') }}" class="btn btn-secondary">&larr; Back</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

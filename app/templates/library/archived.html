@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Archived Items</h2>
+  <a href="{{ url_for('library.index') }}" class="btn btn-secondary mb-3">&larr; Back</a>
+  <table class="table table-striped">
+    <tr>
+      <th>Title</th><th>Description</th><th>Category</th><th>Actions</th>
+    </tr>
+    {% for item in items %}
+    <tr>
+      <td>{{ item.title }}</td>
+      <td>{{ item.description or '' }}</td>
+      <td>{{ item.category.name if item.category else '' }}</td>
+      <td>
+        <form action="{{ url_for('library.restore_item', item_id=item.id) }}" method="POST" style="display:inline;">
+          <button class="btn btn-sm btn-success">Restore</button>
+        </form>
+        <form action="{{ url_for('library.delete_item', item_id=item.id) }}" method="POST"
+              style="display:inline;" onsubmit="return confirm('Permanently delete?');">
+          <button class="btn btn-sm btn-danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4" class="text-muted">No archived items</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

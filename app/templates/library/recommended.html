@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Recommended Articles</h2>
+<ol>
+{% for item,score in ranked %}
+  <li>
+    <a href="{{ url_for('library.view_item', item_id=item.id) }}">{{ item.title }}</a>
+    (score={{"%.2f"|format(score)}} bias={{item.bias_weight}})
+  </li>
+{% endfor %}
+</ol>
+{% endblock %}

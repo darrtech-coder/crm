@@ -1,0 +1,20 @@
+<h5>Course Requirements</h5>
+<table class="table table-sm">
+<thead><tr><th>Course</th><th>Type</th><th>Status</th></tr></thead>
+<tbody>
+  {% for r in requirements %}
+  {% set done = r.course.id in completed_ids %}
+  <tr>
+    <td><a href="{{ url_for('library.view_item', item_id=r.course.id) }}" target="_blank">{{ r.course.title }}</a></td>
+    <td class="text-capitalize">{{ r.requirement_type }}</td>
+    <td>
+      {% if done %}
+        <span class="text-success">✅</span>
+      {% else %}
+        <span class="text-danger">❌</span>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</tbody>
+</table>

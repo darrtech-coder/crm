@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block content %}
+  <a href="{{ back_url(default_endpoint='teams.detail', team_id=user.team_memberships[0].team_id if user.team_memberships else None) }}" 
+     class="btn btn-secondary mb-3">&larr; Back</a>
+<div class="container mt-4">
+
+  <h2>📈 Activity for – {{ user.name or user.username }}</h2>
+
+  <ul class="nav nav-tabs" id="activityTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <a class="nav-link active" id="week-tab" data-bs-toggle="tab" href="#week" role="tab">This Week</a>
+    </li>
+    <li class="nav-item" role="presentation">
+      <a class="nav-link" id="month-tab" data-bs-toggle="tab" href="#month" role="tab">This Month</a>
+    </li>
+    <li class="nav-item" role="presentation">
+      <a class="nav-link" id="log-tab" data-bs-toggle="tab" href="#log" role="tab">Library Log</a>
+    </li>
+    <li class="nav-item" role="presentation">
+      <a class="nav-link" id="tests-tab" data-bs-toggle="tab" href="#tests" role="tab">Test History</a>
+    </li>
+    <li class="nav-item" role="presentation">
+      <a class="nav-link" id="summary-tab" data-bs-toggle="tab" href="#summary" role="tab">Activity Summary</a>
+    </li>
+  </ul>
+
+  <div class="tab-content p-3 border border-top-0">
+    <div id="week" class="tab-pane fade show active" role="tabpanel">
+      <canvas id="loginChart" height="120"></canvas>
+      <canvas id="studyChart" height="120"></canvas>
+    </div>
+    <div id="month" class="tab-pane fade" role="tabpanel">
+      <canvas id="monthChart" height="120"></canvas>
+    </div>
+    
+    <div id="log" class="tab-pane fade" role="tabpanel">
+      <h5>Library Activity Log</h5>
+      <table class="table table-sm table-striped">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Viewed On</th>
+            <th>Duration</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for session in library_history %}
+          <tr>
+            <td>
+              <a href="{{ url_for('library.view_item', item_id=session.item_id) }}">{{ session.item.title }}</a>
+            </td>
+            <td>{{ session.started_at | tz('%Y-%m-%d %H:%M') }}</td>
+            <td>
+                {% set minutes = (session.duration / 60)|int %}
+                {% set seconds = session.duration % 60 %}
+                {{ minutes }}m {{ seconds }}s
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" class="text-muted">No library activity recorded.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div id="tests" class="tab-pane fade" role="tabpanel">
+      <h5>Test History</h5>
+      <table class="table table-sm table-striped">
+        <thead>
+          <tr>
+            <th>Test</th>
+            <th>Submitted On</th>
+            <th>Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sub in test_history %}
+          <tr>
+            <td>
+              <a href="{{ url_for('tests.test_result', test_id=sub.test_id) }}">{{ sub.test.title }}</a>
+            </td>
+            <td>{{ sub.submitted_at | tz('%Y-%m-%d %H:%M') }}</td>
+            <td>{{ "%.1f"|format(sub.score or 0) }} / {{ sub.test.questions|length * 5 }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" class="text-muted">No test submissions recorded.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div id="summary" class="tab-pane fade" role="tabpanel">
+      <h5>Summary: Time Spent per Library Item</h5>
+      <table class="table table-sm table-striped">
+        <thead>
+          <tr>
+            <th>Library Item</th>
+            <th>Total Views</th>
+            <th>Total Time Spent</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item_id, title, total_duration, view_count in activity_summary %}
+          <tr>
+            <td>
+              <a href="{{ url_for('library.view_item', item_id=item_id) }}">{{ title }}</a>
+            </td>
+            <td>{{ view_count }}</td>
+            <td>
+              {% set minutes = (total_duration / 60)|int %}
+              {% set seconds = total_duration % 60 %}
+              {{ minutes }}m {{ seconds }}s
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" class="text-muted">No library activity recorded.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const loginLabels = {{ weekly_labels|tojson }};
+const loginCounts = {{ weekly_logins|tojson }};
+const studyTime = {{ weekly_time|tojson }};
+const monthLabels = {{ monthly_labels|tojson }};
+const monthTotals = {{ monthly_hours|tojson }};
+
+// Weekly Logins
+new Chart(document.getElementById('loginChart'), {
+  type: 'bar',
+  data:{labels:loginLabels, datasets:[{
+    label:'Logins',
+    data:loginCounts,
+    backgroundColor:'steelblue'
+  }]},
+  options:{scales:{y:{beginAtZero:true}}}
+});
+
+// Weekly Study Time
+new Chart(document.getElementById('studyChart'), {
+  type: 'line',
+  data:{labels:loginLabels, datasets:[{
+    label:'Study Time (hours)',
+    data:studyTime,
+    borderColor:'green',
+    tension:0.3,
+    fill:false
+  }]},
+  options:{scales:{y:{beginAtZero:true}}}
+});
+
+// Monthly Totals
+new Chart(document.getElementById('monthChart'), {
+  type:'bar',
+  data:{labels:monthLabels, datasets:[{
+    label:'Total Study Hours',
+    data:monthTotals,
+    backgroundColor:'orange'
+  }]},
+  options:{scales:{y:{beginAtZero:true}}}
+});
+</script>
+{% endblock %}

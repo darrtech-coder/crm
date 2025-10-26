@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title or "CRM App" }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
+  <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="{{ url_for('static', filename='js/tinymce/tinymce.min.js') }}" referrerpolicy="origin"></script>
+  <script>
+tinymce.init({
+  selector: '.tinymce',
+  license_key: 'gpl',
+  plugins: 'lists link media table image code',
+  toolbar: 'undo redo | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | code',
+  height: 300,
+  automatic_uploads: true,
+  images_upload_url: '/presentations/upload_media',
+  file_picker_types: 'image media',
+  relative_urls: false,
+  remove_script_host: false,
+  convert_urls: true,
+  file_picker_callback: function(callback, value, meta) {
+    let win = window.open('/presentations/media_manager?picker=1', 'Media Manager', 'width=900,height=600');
+    window.addEventListener("message", function(event){
+      if(event.data.fileUrl){
+        callback(event.data.fileUrl);
+        win.close();
+      }
+    });
+  }
+});
+
+
+
+
+(function(){ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes('Mac') && 'ontouchend' in document); if (isIOS) return; // iOS restricts programmatic volume control const DEFAULT_VOL = 0.8; const savedVol = Math.max(0, Math.min(1, parseFloat(localStorage.getItem('playerVolume') || DEFAULT_VOL))); function injectOverlay(media){ if (!(media instanceof HTMLMediaElement)) return; // Already wrapped? if (media.parentElement && media.parentElement.classList.contains('media-player-wrap')) return; // Wrap in container const wrap = document.createElement('div'); wrap.className = 'media-player-wrap'; media.parentNode.insertBefore(wrap, media); wrap.appendChild(media); // Set initial volume try { media.volume = savedVol; } catch(e){} // Overlay const ctrl = document.createElement('div'); ctrl.className = 'vol-ctrl'; ctrl.setAttribute('role', 'group'); ctrl.setAttribute('aria-label', 'Volume controls'); const btn = document.createElement('button'); btn.type = 'button'; btn.title = 'Mute / Unmute'; btn.textContent = (media.muted || media.volume === 0) ? '🔇' : '🔊'; const slider = document.createElement('input'); slider.type = 'range'; slider.min = '0'; slider.max = '1'; slider.step = '0.01'; slider.value = String(media.muted ? 0 : media.volume || savedVol); slider.title = 'Volume'; // Wire events btn.addEventListener('click', ()=>{ media.muted = !media.muted; if (!media.muted && parseFloat(slider.value) === 0) { slider.value = '0.5'; media.volume = 0.5; localStorage.setItem('playerVolume', '0.5'); } btn.textContent = media.muted ? '🔇' : (media.volume > 0.5 ? '🔊' : '🔉'); }); slider.addEventListener('input', ()=>{ const v = Math.max(0, Math.min(1, parseFloat(slider.value))); try { media.volume = v; } catch(e){} media.muted = (v === 0); btn.textContent = media.muted ? '🔇' : (v > 0.5 ? '🔊' : '🔉'); }); slider.addEventListener('change', ()=>{ const v = Math.max(0, Math.min(1, parseFloat(slider.value))); localStorage.setItem('playerVolume', String(v)); }); ctrl.appendChild(btn); ctrl.appendChild(slider); wrap.appendChild(ctrl); // Keep icon in sync if volume changes elsewhere media.addEventListener('volumechange', ()=>{ const v = media.muted ? 0 : (media.volume || 0); slider.value = String(v); btn.textContent = (v === 0) ? '🔇' : (v > 0.5 ? '🔊' : '🔉'); }); } function init(){ const players = document.querySelectorAll('video.media-player, audio.media-player'); players.forEach(injectOverlay); } document.addEventListener('DOMContentLoaded', init); })(); 
+  </script>
+
+    <!-- [NEW] Emoji Picker Script -->
+    <script type="module" src="{{ url_for('static', filename='js/npm/emoji-picker/index.js') }}"></script>
+
+    <!-- [NEW] Emoji Picker Script -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="{{ url_for('index') }}">CRM</a>
+      <div>
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          {% if current_user.is_authenticated %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard.index') }}">Dashboard</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('presentations.index')}}">Presentations</a></li>	
+  <li class="nav-item"><a class="nav-link"  href="{{ url_for('library.index') }}">Library</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('academy.index') }}">Academy</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('profile.edit_profile') }}">My Profile</a></li>
+  {% if current_user.role in ("ADMIN", "SUPER_ADMIN") %}
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard.users') }}">Users</a></li>
+  {% endif %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('messaging.rooms') }}">Messaging</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard.unread_notifications') }}">Notifications</a></li>
+
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('coaching.list_plans') }}">Coaching</a></li>
+
+{% if current_user.role != 'AGENT' %}
+  <li class="nav-item"><a class="nav-link" href="{{ url_for('tests.index') }}">Manage Tests</a></li>
+{% else %}
+  <li class="nav-item"><a class="nav-link" href="{{ url_for('tests.index') }}">My Tests</a></li>
+{% endif %}
+
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a></li>
+
+<li class="nav-item dropdown">
+  <a class="nav-link dropdown-toggle" href="#" id="notifDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+    🔔<span class="badge bg-danger" id="notifCount">0</span>
+  </a>
+  <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notifDropdown" style="min-width:300px;" id="notifList">
+    <li><span class="dropdown-item text-muted">Loading…</span></li>
+  </ul>
+
+          {% else %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.login') }}">Login</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.register') }}">Register</a></li>
+          {% endif %}
+
+
+</li>
+
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mt-4">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category=='error' else category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </div>
+  <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>  
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function loadNotifications(){
+  fetch("{{ url_for('notifications.poll') }}")
+    .then(r => r.json())
+    .then(data => {
+      let list = document.getElementById("notifList");
+      let count = document.getElementById("notifCount");
+      count.innerText = data.length;
+
+      if(data.length === 0){
+        list.innerHTML = '<li><span class="dropdown-item text-muted">No new notifications</span></li>';
+      } else {
+        list.innerHTML = "";
+        data.slice(0,5).forEach(n => {
+          let li = document.createElement("li");
+          li.innerHTML = `<a class="dropdown-item small" href="{{ url_for('dashboard.unread_notifications') }}">
+                            ${n.message}<br><small class="text-muted">${n.time}</small>
+                          </a>`;
+          list.appendChild(li);
+        });
+        let liAll = document.createElement("li");
+        liAll.innerHTML = `<a class="dropdown-item text-center fw-bold" href="{{ url_for('dashboard.unread_notifications') }}">View all</a>`;
+        list.appendChild(liAll);
+      }
+    });
+}
+setInterval(loadNotifications, 60000); // refresh every 10s
+document.addEventListener("DOMContentLoaded", loadNotifications);
+</script>
+</body>
+</html>

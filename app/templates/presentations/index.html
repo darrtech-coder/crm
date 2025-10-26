@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary mb-3">&larr; Back</a>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">📑 Presentations</h2>
+    {% if summary %}
+      <div>
+        <span class="badge bg-primary me-2">Total: {{ summary.total }}</span>
+        {% if summary.last_backup %}
+          <span class="badge bg-success">Last Backup: {{ summary.last_backup }}</span>
+        {% else %}
+          <span class="badge bg-secondary">No backups yet</span>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- 🔎 Search bar -->
+  <form method="GET" action="{{ url_for('presentations.search') }}" class="input-group mb-4">
+    <input type="text" class="form-control" name="q" placeholder="Search presentations" required>
+    <button class="btn btn-outline-primary" type="submit">Search</button>
+  </form>
+
+  <table class="table table-striped align-middle shadow-sm">
+    <thead class="table-light">
+      <tr>
+        <th>Title</th>
+        <th style="width:40%">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in presentations %}
+      <tr>
+        <td>
+          <strong>{{ p.title }}</strong>
+          <small class="text-muted d-block">Slides: {{ p.slides|length }} | Created {{ p.created_at | tz("%Y-%m-%d") }}</small>
+        </td>
+        <td>
+          <!-- Run -->
+          <a class="btn btn-sm btn-primary" href="{{ url_for('presentations.run_agent', pres_id=p.id) }}">Run (Agent)</a>
+          <a href="#"
+             class="btn btn-sm btn-secondary"
+             onclick="openClientWindow('{{ url_for('presentations.run_client', pres_id=p.id) }}'); return false;">
+             Run (Client)
+          </a>
+          {% if current_user.role in ["MANAGER","ADMIN","SUPER_ADMIN"] %}
+            <a class="btn btn-sm btn-warning" href="{{ url_for('presentations.edit', pres_id=p.id) }}">Edit</a>
+            <form method="POST" action="{{ url_for('presentations.delete_presentation', pres_id=p.id) }}" class="d-inline" onsubmit="return confirm('Delete presentation?');">
+              <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+            </form>
+            <a class="btn btn-sm btn-outline-dark" href="{{ url_for('presentations.export_zpb', pres_id=p.id) }}">💾 Export</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="2" class="text-muted">No presentations found</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if current_user.role in ["MANAGER","ADMIN","SUPER_ADMIN"] %}
+  <div class="d-flex gap-2 mt-3 flex-wrap">
+    <a class="btn btn-success" href="{{ url_for('presentations.create') }}">+ Create Presentation</a>
+    <a class="btn btn-info" href="{{ url_for('presentations.import_ppt') }}">+ Import from PPTX</a>
+<a class="btn btn-outline-danger" href="{{ url_for('presentations.import_pdf') }}">+ Import from PDF</a>
+    <a class="btn btn-warning" href="{{ url_for('presentations.import_zpb') }}">+ Import from ZPB</a>
+    {% if current_user.role in ["ADMIN","SUPER_ADMIN"] %}
+      <a class="btn btn-dark" href="{{ url_for('presentations.export_all_zpb') }}">💾 Export ALL</a>
+      <a class="btn btn-outline-warning" href="{{ url_for('presentations.import_all_zpb') }}">📥 Import ALL</a>
+      <a class="btn btn-outline-info" href="{{ url_for('presentations.export_select_zpb') }}">📤 Export Selected</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function openClientWindow(url) {
+  let win = window.open(url, "ClientView",
+      "toolbar=no,menubar=no,location=no,status=no," +
+      "scrollbars=no,resizable=yes,width=" + screen.width +
+      ",height=" + screen.height);
+  if (win) { win.focus(); try { win.document.documentElement.requestFullscreen(); } catch(e){} }
+}
+</script>
+{% endblock %}

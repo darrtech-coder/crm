@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block content %}
+  <a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary mb-3">&larr; Back</a>
+<div class="container mt-4">
+  <h2>System Settings</h2>
+  <form method="POST">
+    <div class="form-check mb-3">
+      <input type="checkbox" class="form-check-input" id="log_unauth" name="log_unauth" 
+             {% if settings.log_unauth == "True" or settings.log_unauth == True %}checked{% endif %}>
+      <label for="log_unauth" class="form-check-label">Log unauthorized access attempts</label>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-md-4">
+        <label class="form-label">Max Failed Logins</label>
+        <input type="number" class="form-control" name="max_failed" value="{{ settings.max_failed }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Lockout (minutes)</label>
+        <input type="number" class="form-control" name="lockout" value="{{ settings.lockout }}">
+      </div>
+    </div>
+
+    <div class="form-check mb-3">
+      <input type="checkbox" class="form-check-input" id="allow_reg" name="allow_reg"
+             {% if settings.allow_reg == "True" or settings.allow_reg == True %}checked{% endif %}>
+      <label for="allow_reg" class="form-check-label">Allow self‑registration</label>
+    </div>
+
+
+<!-- app/templates/dashboard/settings.html -->
+<h4>Password Complexity</h4>
+<div class="row mb-3">
+  <div class="col-md-3">
+    <label class="form-label">Minimum Length</label>
+    <input type="number" class="form-control" name="pw_length" value="{{ settings.pw_length }}">
+  </div>
+</div>
+
+<div class="form-check">
+  <input class="form-check-input" type="checkbox" name="pw_upper" id="pw_upper"
+         {% if settings.pw_upper %}checked{% endif %}>
+  <label class="form-check-label" for="pw_upper">Require Uppercase Letter</label>
+</div>
+<div class="form-check">
+  <input class="form-check-input" type="checkbox" name="pw_number" id="pw_number"
+         {% if settings.pw_number %}checked{% endif %}>
+  <label class="form-check-label" for="pw_number">Require Number</label>
+</div>
+<div class="form-check">
+  <input class="form-check-input" type="checkbox" name="pw_symbol" id="pw_symbol"
+         {% if settings.pw_symbol %}checked{% endif %}>
+  <label class="form-check-label" for="pw_symbol">Require Symbol</label>
+</div>
+
+
+<hr>
+<h4>Regional & Infrastructure</h4>
+<div class="row mb-3">
+<div class="col-md-4">
+  {% include "dashboard/timezones.html" %}
+</div>
+  <div class="col-md-4">
+    <label class="form-label">Redis Mode</label>
+    <select name="redis_mode" id="redis_mode" class="form-select">
+      <option value="local"  {{ 'selected' if settings.redis_mode=='local' }}>Local (default)</option>
+      <option value="remote" {{ 'selected' if settings.redis_mode=='remote' }}>Remote</option>
+      <option value="none"   {{ 'selected' if settings.redis_mode=='none' }}>None (disable)</option>
+    </select>
+  </div>
+  <div class="col-md-4" id="redis_url_wrap" style="display: none;">
+    <label class="form-label">Redis URL</label>
+    <input class="form-control" name="redis_url" id="redis_url"
+           placeholder="redis://:password@host:6379/0"
+           value="{{ settings.redis_url or '' }}">
+    <small class="text-muted">Required if mode is Remote.</small>
+  </div>
+</div>
+
+
+
+    <button type="submit" class="btn btn-primary">Save Settings</button>
+    <a href="{{ url_for('dashboard.super_admin') }}" class="btn btn-secondary">Cancel</a>
+  </form>
+</div>
+
+<script>
+  function toggleRedisUrl(){
+    const mode = document.getElementById('redis_mode').value;
+    document.getElementById('redis_url_wrap').style.display = (mode === 'remote') ? 'block' : 'none';
+  }
+  document.getElementById('redis_mode').addEventListener('change', toggleRedisUrl);
+  document.addEventListener('DOMContentLoaded', toggleRedisUrl);
+</script>
+{% endblock %}

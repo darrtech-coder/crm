@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Preview Imported Presentation: {{ title }}</h2>
+
+<div class="mb-3">
+  <form method="POST" action="{{ url_for('presentations.confirm_import') }}">
+    <button type="submit" class="btn btn-success">Confirm & Save</button>
+    <a href="{{ url_for('presentations.import_ppt') }}" class="btn btn-secondary">Cancel</a>
+  </form>
+</div>
+<hr/>
+
+{% for s in slides %}
+<div class="slide border p-3 mb-4">
+  <h4>Slide {{ loop.index }}: Client View</h4>
+  <div class="slide">{{ s.client|safe }}</div>
+  {% if s.notes %}
+    <h5 class="mt-3">Agent Notes</h5>
+    <div class="slide agent-notes">{{ s.notes|safe }}</div>
+  {% endif %}
+</div>
+{% endfor %}
+{% endblock %}

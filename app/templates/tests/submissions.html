@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Submissions for "{{ test.title }}"</h2>
+  <table class="table table-striped align-middle">
+    <thead>
+      <tr><th>User</th><th>Submitted</th><th>Score</th><th>Action</th></tr>
+    </thead>
+    <tbody>
+    {% for s in submissions %}
+      <tr>
+        <td>{{ s.user.username }}</td>
+        <td>{{ s.submitted_at | tz("%Y-%m-%d %H:%M") }}</td>
+        <td>{{ "%.1f"|format(s.score or 0) }}</td>
+        <td>
+          <a class="btn btn-sm btn-outline-primary"
+             href="{{ url_for('tests.grade_submission', submission_id=s.id) }}">
+             Grade / Review
+          </a>
+<a class="btn btn-sm btn-outline-dark"
+   href="{{ url_for('tests.export_submission_zip', submission_id=s.id) }}">
+   Export ZIP
+</a>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4" class="text-muted">No submissions yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+<div class="d-flex justify-content-between align-items-center">
+  <h2>Submissions for "{{ test.title }}"</h2>
+  {% if current_user.role in ("MANAGER","ADMIN","SUPER_ADMIN") %}
+    <a class="btn btn-outline-dark"
+       href="{{ url_for('tests.export_test_answers_zip', test_id=test.id) }}">
+      💾 Export All (ZIP)
+    </a>
+  {% endif %}
+</div>
+  <a href="{{ url_for('tests.index', test_id=test.id) }}"
+     class="btn btn-secondary">← Back to Test</a>
+</div>
+{% endblock %}

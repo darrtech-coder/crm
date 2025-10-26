@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header"><h4>Create New Badge</h4></div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('badges.create_badge') }}" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label class="form-label">Badge Name</label>
+                            <input type="text" name="name" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea name="description" class="form-control" rows="2"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Badge Image (PNG, SVG, GIF)</label>
+                            <input type="file" name="image_file" class="form-control" accept="image/*" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Create Badge</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header"><h4>Award Badge to User</h4></div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('badges.award_badge') }}">
+                        <div class="mb-3">
+                            <label class="form-label">Select User</label>
+                            <select name="user_id" class="form-select" required>
+                                <option value="">-- Choose a user --</option>
+                                {% for user in users %}
+                                <option value="{{ user.id }}">{{ user.username }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Select Badge</label>
+                            <select name="badge_id" class="form-select" required>
+                                <option value="">-- Choose a badge --</option>
+                                {% for badge in badges %}
+                                <option value="{{ badge.id }}">{{ badge.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-success">Award Badge</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h4 class="mt-5">Existing Badges</h4>
+    <div class="d-flex flex-wrap gap-3">
+        {% for badge in badges %}
+            <div class="text-center">
+                <img src="{{ url_for('static', filename='badges/' + badge.image_file) }}" alt="{{ badge.name }}" width="64" height="64" title="{{ badge.description }}">
+                <p class="small mb-0">{{ badge.name }}</p>
+            </div>
+        {% else %}
+            <p class="text-muted">No badges created yet.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

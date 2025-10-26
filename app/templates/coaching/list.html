@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+  <a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary mb-3">&larr; Back</a>
+<h2>Coaching Plans</h2>
+
+<table class="table table-striped align-middle">
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Due Date</th>
+      {% if current_user.role in ("MANAGER","ADMIN","SUPER_ADMIN") %}
+        <th>Actions</th>
+      {% else %}
+        <th>Status</th>
+      {% endif %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in plans %}
+    <tr>
+      <td>
+        {# --- [FIX] Turn title into a link --- #}
+        <a href="{{ url_for('coaching.view_plan', plan_id=p.id) }}">
+          <strong>{{ p.title }}</strong>
+        </a>
+      </td>
+      <td>{{ p.due_date | tz("%Y-%m-%d") if p.due_date else "—" }}</td>
+      
+      {% if current_user.role in ("MANAGER","ADMIN","SUPER_ADMIN") %}
+      <td>
+        <a href="{{ url_for('coaching.plan_progress', plan_id=p.id) }}"
+           class="btn btn-sm btn-outline-success">📊 View Progress</a>
+        <a href="{{ url_for('coaching.edit_plan', plan_id=p.id) }}"
+           class="btn btn-sm btn-primary">Edit</a>
+        <form method="POST"
+              action="{{ url_for('coaching.duplicate_plan', plan_id=p.id) }}"
+              style="display:inline"
+              onsubmit="return confirm('Create a copy of this coaching plan?');">
+          <button class="btn btn-sm btn-secondary">Duplicate</button>
+        </form>
+        
+        <form method="POST"
+              action="{{ url_for('coaching.delete_plan', plan_id=p.id) }}"
+              style="display:inline"
+              onsubmit="return confirm('Delete coaching plan {{p.title}}?');">
+          <button class="btn btn-sm btn-danger">Delete</button>
+        </form>
+      </td>
+      {% else %}
+        {# --- [NEW] Show status for agents --- #}
+        <td>
+          {% if p.id in acknowledged_ids %}
+            <span class="badge bg-success">✓ Completed</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">Pending</span>
+          {% endif %}
+        </td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if current_user.role in ["MANAGER","ADMIN","SUPER_ADMIN"] %}
+  <a href="{{ url_for('coaching.create_plan') }}" class="btn btn-success">＋ Create Coaching Plan</a>
+{% endif %}
+{% endblock %}

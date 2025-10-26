@@ -1,0 +1,189 @@
+{# app/templates/coaching/create.html #}
+{% extends "base.html" %}
+{% block content %}
+
+<a href="{{ url_for('coaching.list_plans') }}" class="btn btn-secondary mb-3">&larr; Back to Plans</a>
+
+<div class="container mt-4">
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">Create Coaching Plan</h2>
+      <p class="text-muted">Define objectives, assign to users or teams, and link courses or tests.</p>
+
+      <form method="POST">
+        <!-- Title -->
+        <div class="mb-3">
+          <label class="form-label">Title</label>
+          <input type="text" name="title" class="form-control" placeholder="Coaching Plan Title" required>
+        </div>
+
+        <!-- Description -->
+        <div class="mb-3">
+          <label class="form-label">Description</label>
+          <textarea name="description" class="form-control" rows="3" placeholder="What is the goal of this plan?"></textarea>
+        </div>
+
+        <!-- Due Date -->
+        <div class="mb-3">
+          <label class="form-label">Due Date</label>
+          <input type="date" name="due_date" class="form-control">
+        </div>
+
+        <!-- Pass mark -->
+        <div class="mb-3">
+          <label class="form-label">Pass Mark (%)</label>
+          <input type="number" name="pass_percent" min="0" max="100" value="60" class="form-control">
+        </div>
+
+        <!-- Assignment -->
+        <div class="mb-3">
+          <label class="form-label">Assign To</label>
+          <div class="input-group">
+            <div class="position-relative flex-grow-1">
+                <input type="text" id="user-search-box" class="form-control" placeholder="Search for a User (optional)">
+                <div class="list-group position-absolute w-100" id="user-search-results" style="z-index: 1000; display:none;"></div>
+                <input type="hidden" name="assigned_to" id="assigned_to_hidden">
+            </div>
+            <span class="input-group-text">or</span>
+            <select class="form-select" name="team_id">
+              <option value="">-- Assign to Team --</option>
+              {% for t in teams %}
+              <option value="{{ t.id }}">{{ t.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div id="selected-user-tag" class="mt-2"></div>
+          <div class="form-text">You can assign either to a specific user or to a team.</div>
+        </div>
+
+        <!-- Attach Library Courses -->
+        <div class="mb-3">
+            <label class="form-label">Search & Attach Library Items</label>
+            <div class="position-relative">
+                <input class="form-control" id="courseSearch" placeholder="Type to search library…">
+                <div class="list-group position-absolute w-100 shadow-sm" id="courseResult" style="z-index:10; max-height:200px; overflow-y:auto; display:none;"></div>
+            </div>
+            <div id="selected-courses" class="mt-2 d-flex flex-wrap gap-2">
+                <!-- Selected courses will be added here -->
+            </div>
+        </div>
+
+        <!-- Attach Tests -->
+        <div class="mb-3">
+            <label class="form-label">Search & Attach Tests</label>
+            <div class="position-relative">
+                <input class="form-control" id="testSearch" placeholder="Search tests…">
+                <div class="list-group position-absolute w-100 shadow-sm" id="testResult" style="z-index:9; max-height:200px; overflow-y:auto; display:none;"></div>
+            </div>
+            <div id="selected-tests" class="mt-2 d-flex flex-wrap gap-2">
+                <!-- Selected tests will be added here -->
+            </div>
+            <small class="text-muted">All required courses linked to these tests will be added automatically.</small>
+        </div>
+
+
+<!-- Attach Academy Courses -->
+<div class="mb-3">
+  <label class="form-label">Search & Attach Academy Courses</label>
+  <div class="position-relative">
+    <input class="form-control" id="academyCourseSearch" placeholder="Search academy courses…">
+    <div class="list-group position-absolute w-100 shadow-sm" id="academyCourseResult" style="z-index:8; max-height:200px; overflow-y:auto; display:none;"></div>
+  </div>
+  <div id="selected-academy-courses" class="mt-2 d-flex flex-wrap gap-2"></div>
+</div>
+
+
+        <div class="d-grid">
+          <button type="submit" class="btn btn-success btn-lg">Create Plan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function enableAutocomplete(inputId, url, resultsId, selectedContainerId, hiddenInputName, isSingleSelect = false) {
+    const input = document.getElementById(inputId);
+    const results = document.getElementById(resultsId);
+    const container = document.getElementById(selectedContainerId);
+    const hiddenInput = isSingleSelect ? document.getElementById(hiddenInputName) : null;
+
+    input.addEventListener("input", () => {
+        const q = input.value.trim();
+        if (q.length < 2) {
+            results.style.display = "none";
+            return;
+        }
+        fetch(`${url}?q=${encodeURIComponent(q)}`)
+            .then(r => r.json())
+            .then(data => {
+                results.innerHTML = "";
+                if (!data.length) {
+                    results.style.display = "none";
+                    return;
+                }
+                data.forEach(row => {
+                    const li = document.createElement("li");
+                    li.className = "list-group-item list-group-item-action";
+                    li.textContent = isSingleSelect ? row.text : row.title;
+                    li.addEventListener("click", () => {
+                        if (isSingleSelect) {
+                            addSingleItem(container, hiddenInput, row.id, row.text);
+                        } else {
+                            addItem(selectedContainerId, hiddenInputName, row.id, row.title);
+                        }
+                        input.value = "";
+                        results.style.display = "none";
+                    });
+                    results.appendChild(li);
+                });
+                results.style.display = "block";
+            });
+    });
+}
+
+function addSingleItem(container, hiddenInput, id, text) {
+    container.innerHTML = ''; // Clear previous selection
+    const badge = document.createElement("span");
+    badge.className = "badge bg-primary d-flex align-items-center";
+    badge.innerHTML = `${text} <button type="button" class="btn-close ms-2" onclick="removeSingleItem(this, '${container.id}', '${hiddenInput.id}')"></button>`;
+    container.appendChild(badge);
+    hiddenInput.value = id;
+}
+
+function removeSingleItem(button, containerId, hiddenInputId) {
+    document.getElementById(containerId).innerHTML = '';
+    document.getElementById(hiddenInputId).value = '';
+}
+
+function addItem(containerId, name, id, title) {
+    const container = document.getElementById(containerId);
+    // Prevent adding duplicates
+    if (container.querySelector(`input[value="${id}"]`)) return;
+
+    const badge = document.createElement("span");
+    const bgColor = name === 'items' ? 'bg-info text-dark' : 'bg-secondary';
+    badge.className = `badge ${bgColor} d-flex align-items-center`;
+    badge.innerHTML = `
+        ${title}
+        <button type="button" class="btn-close ms-2" onclick="removeItem(this, '${name}', ${id})"></button>
+        <input type="hidden" name="${name}" value="${id}">
+    `;
+    container.appendChild(badge);
+}
+
+function removeItem(button, name, id) {
+    button.parentElement.remove();
+}
+
+enableAutocomplete("courseSearch", "/coaching/search_courses", "courseResult", "selected-courses", "items");
+enableAutocomplete("testSearch", "/coaching/search_tests", "testResult", "selected-tests", "tests");
+enableAutocomplete("user-search-box", "/coaching/search_users", "user-search-results", "selected-user-tag", "assigned_to_hidden", true);
+  enableAutocomplete("academyCourseSearch",
+                     "/coaching/search_academy_courses",
+                     "academyCourseResult",
+                     "selected-academy-courses",
+                     "academy_courses");
+</script>
+
+{% endblock %}

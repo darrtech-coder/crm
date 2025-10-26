@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>My Team – User Management</h2>
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>ID</th><th>Username</th><th>Email</th><th>Role</th>
+        <th>Approved</th><th>Disabled</th><th>Actions</th><th>Set Role</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr id="user-{{u.id}}">
+        <td>{{ u.id }}</td>
+        <td>{{ u.username }}</td>
+        <td>{{ u.email }}</td>
+        <td>{{ u.role }}</td>
+        <td>{{ "✅" if u.approved else "❌" }}</td>
+        <td>{{ "🚫" if u.disabled else "✔️" }}</td>
+        <td>
+          <button class="btn btn-sm btn-info" onclick="resetPw({{u.id}})">Reset PW</button>
+          <button class="btn btn-sm btn-warning" onclick="unlockUser({{u.id}})">Unlock</button>
+        </td>
+<td>
+  {% if u.role in ("AGENT","MANAGER") %}
+    <select class="form-select form-select-sm" onchange="setRole({{u.id}}, this.value)">
+      <option value="AGENT" {{ "selected" if u.role=="AGENT" }}>Agent</option>
+      <option value="MANAGER" {{ "selected" if u.role=="MANAGER" }}>Manager</option>
+    </select>
+  {% else %}
+    <span class="badge bg-secondary">{{ u.role }}</span>
+  {% endif %}
+</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+function resetPw(id){
+  fetch(`/dashboard/admin/users/${id}/reset_pw`, {method:"POST"})
+    .then(r=>r.json()).then(data=>{
+      if(data.ok){ alert("New password: "+data.new_pw); }
+    });
+}
+function unlockUser(id){
+  fetch(`/dashboard/admin/users/${id}/unlock`, {method:"POST"})
+    .then(r=>r.json()).then(()=>location.reload());
+}
+
+function setRole(id, role){
+  fetch(`/dashboard/manager/users/${id}/set_role`, {
+    method:"POST",
+    headers:{"Content-Type":"application/x-www-form-urlencoded"},
+    body:"role=" + role
+  }).then(r=>r.json()).then(data=>{
+    if(!data.ok){ alert("Error: " + (data.error || "Failed")); }
+    else { alert("Role updated to " + data.role); location.reload(); }
+  });
+}
+</script>
+{% endblock %}

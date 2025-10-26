@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4 text-center">
+  <h2 class="mb-4">Super Admin Dashboard</h2>
+<hr>
+  <div class="row justify-content-center">
+  <div class="row justify-content-center">
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('dashboard.users') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-person-fill display-6 d-block mb-2 text-primary"></i>
+        Users
+      </a>
+    </div>
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('teams.index') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-people-fill display-6 d-block mb-2 text-primary"></i>
+        Manage Teams
+      </a>
+    </div>
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('leads.index') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-person-lines-fill display-6 d-block mb-2 text-success"></i>
+        Leads
+      </a>
+    </div>
+
+    <!-- Library Upload -->
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('library.upload') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-journal-plus display-6 d-block mb-2 text-info"></i>
+        Upload Knowledge
+      </a>
+    </div>
+
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('library.index') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-journal-bookmark-fill display-6 d-block mb-2 text-info"></i>
+        Library
+      </a>
+    </div>
+
+<div class="col-md-3 mb-3">
+  <a href="{{ url_for('academy.index') }}" class="btn btn-light w-100 py-3 shadow-sm">
+    <i class="bi bi-mortarboard-fill display-6 d-block mb-2 text-primary"></i>
+    Academy
+  </a>
+</div>
+<div class="col-md-3 mb-3">
+  <a href="{{ url_for('academy.admin_index') }}" class="btn btn-light w-100 py-3 shadow-sm">
+    <i class="bi bi-gear display-6 d-block mb-2 text-secondary"></i>
+    Manage Academy
+  </a>
+</div>
+
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('presentations.index') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-easel-fill display-6 d-block mb-2 text-warning"></i>
+        Presentations
+      </a>
+    </div>
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('presentations.media_manager') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-folder-fill display-6 d-block mb-2 text-secondary"></i>
+        Media Manager
+      </a>
+    </div>
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('coaching.list_plans') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-lightbulb-fill display-6 d-block mb-2 text-danger"></i>
+        Coaching
+      </a>
+    </div>
+
+
+<div class="col-md-3 mb-3">
+  <a href="{{ url_for('tests.index') }}" class="btn btn-light w-100 py-3 shadow-sm">
+    <i class="bi bi-check2-square display-6 d-block mb-2 text-info"></i>
+    Tests / Assessments
+  </a>
+</div>
+
+
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('dashboard.super_admin_logs') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-clipboard-data-fill display-6 d-block mb-2 text-dark"></i>
+        System Logs
+      </a>
+    </div>
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('dashboard.super_admin_settings') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-gear-fill display-6 d-block mb-2 text-muted"></i>
+        System Settings
+      </a>
+    </div>
+    <div class="col-md-3 mb-3">
+      <a href="{{ url_for('dashboard.library_analytics') }}" class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-bar-chart-fill display-6 d-block mb-2 text-success"></i>
+        Library Analytics
+      </a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

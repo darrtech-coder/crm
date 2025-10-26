@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+  <a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary mb-3">&larr; Back</a>
+<div class="container mt-4">
+  <h2>Edit Profile</h2>
+  <form method="POST">
+    <div class="mb-3">
+      <label>Name</label>
+      <input type="text" name="name" value="{{ user.name }}" class="form-control">
+    </div>
+    <div class="mb-3">
+      <label>Email</label>
+      <input type="email" name="email" value="{{ user.email }}" class="form-control">
+    </div>
+    <div class="mb-3">
+      <label>Username</label>
+      <input type="text" value="{{ user.username }}" class="form-control" disabled>
+    </div>
+    <div class="mb-3">
+      <label>DOB</label>
+      <input type="date" name="dob" value="{{ user.dob }}" class="form-control">
+    </div>
+    <div class="mb-3">
+      <label>Gender</label>
+      <select name="gender" class="form-control">
+        <option value="">--</option>
+        <option value="Male" {{ "selected" if user.gender=="Male" }}>Male</option>
+        <option value="Female" {{ "selected" if user.gender=="Female" }}>Female</option>
+      </select>
+    </div>
+    <div class="mb-3">
+      <label>New Password</label>
+      <input type="password" name="password" class="form-control">
+    </div>
+
+<div class="mb-3">
+  <label>Theme Preference</label>
+  <select name="theme" class="form-control">
+    <option value="light" {{ "selected" if user.theme=="light" }}>Light</option>
+    <option value="dark" {{ "selected" if user.theme=="dark" }}>Dark</option>
+  </select>
+</div>
+
+<div class="mb-3">
+{% set selected_tz = user.timezone or 'UTC' %}
+{% set field_name  = 'timezone' %}
+{% include "dashboard/timezones.html" %}
+</div>
+
+
+    <button type="submit" class="btn btn-primary">Save</button>
+  </form>
+</div>
+{% endblock %}

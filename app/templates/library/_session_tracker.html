@@ -1,0 +1,38 @@
+<script>
+(function(){
+  {# Find the correct item object to track #}
+  {% set tracked_item = session_item or item or None %}
+
+  {% if tracked_item and tracked_item.id %}
+    const endUrl = "{{ url_for('library.end_session', item_id=tracked_item.id) }}";
+    let start = Date.now(), total = 0;
+
+    function send(secs){
+      const data = JSON.stringify({ duration: Math.max(0, Math.floor(secs)) });
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(endUrl, data);
+      } else {
+        fetch(endUrl, { method: "POST", body: data, keepalive: true });
+      }
+    }
+
+    function onHide(){
+      total += Date.now() - start;
+      send(total / 1000);
+    }
+
+    document.addEventListener("visibilitychange", function(){
+      if (document.hidden) onHide();
+      else start = Date.now();
+    });
+
+    window.addEventListener("beforeunload", onHide);
+
+    // heartbeat every 60s for long sessions
+    setInterval(function(){
+      const secs = (total + (Date.now() - start)) / 1000;
+      if (secs > 30) send(secs);
+    }, 60000);
+  {% endif %}
+})();
+</script>
