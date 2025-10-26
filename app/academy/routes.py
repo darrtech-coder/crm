@@ -49,14 +49,23 @@ def index():
             (AcademyCourse.title.ilike(like)) |
             (AcademyCourse.description.ilike(like))
         )
-    courses = query.order_by(AcademyCourse.created_at.desc()).all()
+
+    # --- [FIX 1] Define page and per_page at the top so they always exist ---
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 12, type=int)
+
+    # --- [FIX 2] Query the database only ONCE using pagination ---
+    pagination = query.order_by(AcademyCourse.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    courses = pagination.items
 
     # Per-user progress across courses (done/total; complete if all)
     progress = {}
+    
+    # --- [FIX 3] Check if the PAGINATED results have courses ---
     if courses:
         course_ids = [c.id for c in courses]
 
-        # Total items per course
+        # Total items per course (this query is fine as it is)
         totals_rows = (
             db.session.query(AcademyCourseItem.course_id, func.count(AcademyCourseItem.id))
             .filter(AcademyCourseItem.course_id.in_(course_ids))
@@ -65,7 +74,7 @@ def index():
         )
         totals = {cid: cnt for cid, cnt in totals_rows}
 
-        # Completed items per course for current user
+        # Completed items per course for current user (this query is also fine)
         done_rows = (
             db.session.query(AcademyCourseItem.course_id, func.count(AcademyModuleStatus.id))
             .join(AcademyModuleStatus, AcademyModuleStatus.course_item_id == AcademyCourseItem.id)
@@ -76,19 +85,6 @@ def index():
             .group_by(AcademyCourseItem.course_id)
             .all()
         )
-
-
-        page = request.args.get("page", 1, type=int)
-        per_page = request.args.get("per_page", 12, type=int)
-        pagination = query.order_by(AcademyCourse.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
-        courses = pagination.items
-
-        # compute progress only for courses in this page:
-        course_ids = [c.id for c in courses]
-
-
-
-
         dones = {cid: cnt for cid, cnt in done_rows}
 
         for cid in course_ids:
@@ -98,7 +94,14 @@ def index():
             percent = int(round((done / total) * 100)) if total else 0
             progress[cid] = {"total": total, "done": done, "complete": complete, "percent": percent}
 
-    return render_template("academy/index.html", courses=courses, q=q, progress=progress, per_page=per_page)
+    # The template now receives the correct variables in all cases.
+    # We also pass the `pagination` object, which is useful for building page links.
+    return render_template("academy/index.html", 
+                           courses=courses, 
+                           q=q, 
+                           progress=progress, 
+                           pagination=pagination, # Pass pagination object to template
+                           per_page=per_page)
 
 @academy_bp.route("/admin_index")
 @login_required
