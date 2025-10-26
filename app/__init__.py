@@ -1,4 +1,4 @@
-import redis  # <-- ADD THIS IMPORT AT THE TOP OF YOUR FILE
+import redis
 from flask import Flask, render_template, redirect, url_for, request, current_app
 from urllib.parse import urlparse
 from datetime import datetime
@@ -23,9 +23,6 @@ from .profile import profile_bp
 from .coaching import coaching_bp
 from .tests import tests_bp
 from .academy import academy_bp
-
-from sqlalchemy import inspect
-
 from .badges import badges_bp
 
 # Build a reusable timezone list once at import time
@@ -48,59 +45,68 @@ def create_app(config_class="config.DevConfig"):
     # Init core extensions that do not require settings from DB yet
     db.init_app(app)
 
-    # Read DB-backed settings before session/redis init
+    # --- [ROBUST CONFIGURATION LOGIC] ---
+    # This block correctly determines the Redis URL and Mode whether running
+    # locally, remotely, or during the initial setup on a remote server.
     with app.app_context():
         from sqlalchemy import inspect
         inspector = inspect(db.engine)
-        red_url = app.config.get("REDIS_URL") # Start with config default
+        
+        # Start with the URL from the environment/config file. This is our best guess.
+        initial_redis_url = app.config.get("REDIS_URL")
 
         if inspector.has_table("system_setting"):
+            # --- Normal Operation: Read settings from the database ---
             try:
                 from .utils.settings import get_setting
-                # Global fallback timezone for display (overridden per user if set)
                 app.config["TIMEZONE"] = get_setting("TIMEZONE", "UTC")
-                # Redis mode + URL (local | remote | none)
                 app.config["REDIS_MODE"] = get_setting("REDIS_MODE", "local")
-                # Important: get_setting provides the final URL, overriding the one from config
-                red_url = get_setting("REDIS_URL", red_url) 
+                # The DB setting for REDIS_URL overrides everything else.
+                final_redis_url = get_setting("REDIS_URL", initial_redis_url)
+                app.logger.info("✅ Loaded settings from database.")
             except Exception as e:
-                app.logger.warning(f"⚠️ Failed to read system settings from DB: {e}")
+                app.logger.warning(f"⚠️ Failed to read system settings from DB, using fallbacks: {e}")
                 app.config["TIMEZONE"] = "UTC"
-                app.config["REDIS_MODE"] = "local"
+                app.config["REDIS_MODE"] = "local" # Safe fallback
+                final_redis_url = initial_redis_url
         else:
-            app.logger.warning("⚠️ No 'system_setting' table found — using defaults.")
+            # --- Setup Phase: No 'system_setting' table. Be smart about defaults. ---
+            app.logger.warning("⚠️ No 'system_setting' table found — using smart defaults for setup phase.")
             app.config["TIMEZONE"] = "UTC"
-            app.config["REDIS_MODE"] = "local"
+            final_redis_url = initial_redis_url
             
-        # Configure session backend based on Redis mode
+            # THE CRITICAL FIX IS HERE:
+            # If the provided Redis URL is not localhost, assume we are in a production/remote setup.
+            if initial_redis_url and "localhost" not in initial_redis_url and "127.0.0.1" not in initial_redis_url:
+                app.config["REDIS_MODE"] = "remote"
+                app.logger.info("💡 Detected remote Redis URL during setup. Setting REDIS_MODE to 'remote'.")
+            else:
+                app.config["REDIS_MODE"] = "local"
+
+        # Now, configure the session type and create the connection object based on the final decided mode
         if app.config["REDIS_MODE"] == "none":
             app.config["SESSION_TYPE"] = "filesystem"
-            app.config["REDIS_URL"] = "" # Clear the URL if Redis is off
-        else: # Covers "local" and "remote"
-            app.config["SESSION_TYPE"] = "redis"
-            app.config["REDIS_URL"] = red_url # Ensure the final URL is in the config
-
-    # ### --- [FIX] START: CONFIGURE SESSION_REDIS --- ###
-    # This block is the core fix. It runs after all the logic above has determined
-    # the final REDIS_URL string, and it creates the connection object that
-    # Flask-Session actually needs.
-    if app.config.get("SESSION_TYPE") == "redis":
-        redis_url_string = app.config.get("REDIS_URL")
-        if redis_url_string:
-            # Create the Redis connection object from the URL string
-            app.config["SESSION_REDIS"] = redis.from_url(redis_url_string)
-            app.logger.info("✅ Session backend configured to use Redis.")
+            app.logger.info("🔧 Session backend configured to: filesystem.")
         else:
-            # This is a fallback to prevent crashes. The app will likely fail to start
-            # if Redis is required but no URL is provided.
-            app.logger.error("❌ SESSION_TYPE is 'redis' but no REDIS_URL is configured. Sessions will fail.")
-            app.config["SESSION_TYPE"] = "filesystem" # Degrade gracefully if possible
-    # ### --- [FIX] END: CONFIGURE SESSION_REDIS --- ###
+            app.config["SESSION_TYPE"] = "redis"
+            # And critically, create the connection object for Flask-Session
+            if final_redis_url:
+                app.config["SESSION_REDIS"] = redis.from_url(final_redis_url)
+                # Hide password in log for security
+                safe_url = final_redis_url.split('@')[-1]
+                app.logger.info(f"✅ Session backend configured to use Redis at: {safe_url}")
+            else:
+                app.logger.error("❌ Redis mode is enabled, but no REDIS_URL is available. Sessions may fail.")
+                app.config["SESSION_TYPE"] = "filesystem" # Degrade gracefully
+
+
+    # --- [END ROBUST CONFIGURATION LOGIC] ---
+
 
     # Finish extension initialization
     migrate.init_app(app, db)
     login_manager.init_app(app)
-    # Now, session.init_app will find the SESSION_REDIS object and work correctly
+    # session.init_app will now find the correctly configured SESSION_REDIS object
     session.init_app(app) 
     init_redis(app)
 
@@ -402,7 +408,7 @@ def create_app(config_class="config.DevConfig"):
         except Exception as e:
             app.logger.warning(f"⚠️ Skipped auto-creating role-based chatrooms: {e}")
 
-    # --- [NEW] Start background workers here, after app is fully configured ---
+    # Start background workers if Redis is enabled
     if app.config.get("REDIS_MODE", "local") != "none":
         start_background_workers(app)
 
