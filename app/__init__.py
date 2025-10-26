@@ -1,3 +1,4 @@
+import redis  # <-- ADD THIS IMPORT AT THE TOP OF YOUR FILE
 from flask import Flask, render_template, redirect, url_for, request, current_app
 from urllib.parse import urlparse
 from datetime import datetime
@@ -51,6 +52,7 @@ def create_app(config_class="config.DevConfig"):
     with app.app_context():
         from sqlalchemy import inspect
         inspector = inspect(db.engine)
+        red_url = app.config.get("REDIS_URL") # Start with config default
 
         if inspector.has_table("system_setting"):
             try:
@@ -59,48 +61,47 @@ def create_app(config_class="config.DevConfig"):
                 app.config["TIMEZONE"] = get_setting("TIMEZONE", "UTC")
                 # Redis mode + URL (local | remote | none)
                 app.config["REDIS_MODE"] = get_setting("REDIS_MODE", "local")
-                red_url = get_setting("REDIS_URL", app.config.get("REDIS_URL"))
+                # Important: get_setting provides the final URL, overriding the one from config
+                red_url = get_setting("REDIS_URL", red_url) 
             except Exception as e:
                 app.logger.warning(f"⚠️ Failed to read system settings from DB: {e}")
                 app.config["TIMEZONE"] = "UTC"
                 app.config["REDIS_MODE"] = "local"
-                red_url = app.config.get("REDIS_URL", None)
         else:
             app.logger.warning("⚠️ No 'system_setting' table found — using defaults.")
             app.config["TIMEZONE"] = "UTC"
             app.config["REDIS_MODE"] = "local"
-            red_url = app.config.get("REDIS_URL", None)
             
-            
-
         # Configure session backend based on Redis mode
         if app.config["REDIS_MODE"] == "none":
             app.config["SESSION_TYPE"] = "filesystem"
-            app.config["REDIS_URL"] = ""
-        elif app.config["REDIS_MODE"] == "remote" and red_url:
+            app.config["REDIS_URL"] = "" # Clear the URL if Redis is off
+        else: # Covers "local" and "remote"
             app.config["SESSION_TYPE"] = "redis"
-            app.config["REDIS_URL"] = red_url
+            app.config["REDIS_URL"] = red_url # Ensure the final URL is in the config
+
+    # ### --- [FIX] START: CONFIGURE SESSION_REDIS --- ###
+    # This block is the core fix. It runs after all the logic above has determined
+    # the final REDIS_URL string, and it creates the connection object that
+    # Flask-Session actually needs.
+    if app.config.get("SESSION_TYPE") == "redis":
+        redis_url_string = app.config.get("REDIS_URL")
+        if redis_url_string:
+            # Create the Redis connection object from the URL string
+            app.config["SESSION_REDIS"] = redis.from_url(redis_url_string)
+            app.logger.info("✅ Session backend configured to use Redis.")
         else:
-            # local/default: use env or default in config.py
-            app.config["SESSION_TYPE"] = "redis"
-
-
-
-        # Configure session backend based on Redis mode
-        if app.config["REDIS_MODE"] == "none":
-            app.config["SESSION_TYPE"] = "filesystem"
-            app.config["REDIS_URL"] = ""
-        elif app.config["REDIS_MODE"] == "remote" and red_url:
-            app.config["SESSION_TYPE"] = "redis"
-            app.config["REDIS_URL"] = red_url
-        else:
-            # local/default: use env or default in config.py
-            app.config["SESSION_TYPE"] = "redis"
+            # This is a fallback to prevent crashes. The app will likely fail to start
+            # if Redis is required but no URL is provided.
+            app.logger.error("❌ SESSION_TYPE is 'redis' but no REDIS_URL is configured. Sessions will fail.")
+            app.config["SESSION_TYPE"] = "filesystem" # Degrade gracefully if possible
+    # ### --- [FIX] END: CONFIGURE SESSION_REDIS --- ###
 
     # Finish extension initialization
     migrate.init_app(app, db)
     login_manager.init_app(app)
-    session.init_app(app)
+    # Now, session.init_app will find the SESSION_REDIS object and work correctly
+    session.init_app(app) 
     init_redis(app)
 
     # Robust Jinja filter to render datetimes in the user's timezone (or global fallback)
@@ -175,7 +176,6 @@ def create_app(config_class="config.DevConfig"):
     login_manager.login_view = "auth.login"
 
     # Register blueprints
-    # from .badges import badges_bp # <-- Add this import
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(messaging_bp)
@@ -188,22 +188,13 @@ def create_app(config_class="config.DevConfig"):
     app.register_blueprint(coaching_bp)
     app.register_blueprint(tests_bp)
     app.register_blueprint(academy_bp)
-    app.register_blueprint(badges_bp) # <-- Add this line
-
-
-
-
-
-
+    app.register_blueprint(badges_bp)
 
     # Track presence before each request
     @app.before_request
     def track_presence():
         if current_user.is_authenticated:
             mark_user_active(current_user.id)
-
-
-
 
     def _hyphen_alias_path(path: str) -> str:
         """Replace underscores with hyphens only in static segments (not in <variables>)."""
