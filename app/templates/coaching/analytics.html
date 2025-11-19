@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Coaching Analytics (Library Impact)</h2>
+<table border="1">
+<tr><th>Plan</th><th>Completion%</th><th>Views Before</th><th>After</th><th>Rating Before</th><th>After</th><th>Score Before</th><th>After</th></tr>
+{% for r in report %}
+<tr>
+  <td>{{ r.title }}</td>
+  <td>{{ "%.1f"|format(r.completion) }}</td>
+  <td>{{ r.views_before }}</td><td>{{ r.views_after }}</td>
+  <td>{{ "%.1f"|format(r.avg_rating_b) }}</td><td>{{ "%.1f"|format(r.avg_rating_a) }}</td>
+  <td>{{ "%.1f"|format(r.avg_score_b) }}</td><td>{{ "%.1f"|format(r.avg_score_a) }}</td>
+</tr>
+{% endfor %}
+</table>
+
+<canvas id="completionChart"></canvas>
+<canvas id="viewsChart"></canvas>
+<canvas id="scoresChart"></canvas>
+<canvas id="ratingsChart"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const labels={{ chart_data.labels|tojson }};
+new Chart(document.getElementById('completionChart'),{ type:'bar',
+ data:{labels:labels,datasets:[{label:'Completion %',data:{{ chart_data.completion|tojson }},backgroundColor:'steelblue'}]},
+ options:{scales:{y:{beginAtZero:true,max:100}}}});
+new Chart(document.getElementById('viewsChart'),{ type:'bar',
+ data:{labels:labels,datasets:[{label:'View Changes',data:{{ chart_data.views|tojson }},backgroundColor:'orange'}]}});
+new Chart(document.getElementById('scoresChart'),{ type:'bar',
+ data:{labels:labels,datasets:[{label:'Score Change',data:{{ chart_data.scores|tojson }},backgroundColor:'green'}]},
+ options:{scales:{y:{beginAtZero:true}}}});
+new Chart(document.getElementById('ratingsChart'),{ type:'bar',
+ data:{labels:labels,datasets:[{label:'Rating Change',data:{{ chart_data.ratings|tojson }},backgroundColor:'purple'}]},
+ options:{scales:{y:{beginAtZero:true,max:5}}}});
+</script>
+{% endblock %}

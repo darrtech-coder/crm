@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Storage Migration Tool</h2>
+    <p>Use this tool to migrate files from your current storage backend to a new one.</p>
+
+    <div class="alert alert-info">
+        <strong>Current Backend:</strong> <span class="badge bg-primary">{{ current_backend }}</span>
+    </div>
+
+    <h4>Instructions:</h4>
+    <ol>
+        <li>Go to the <a href="{{ url_for('dashboard.super_admin_settings') }}">System Settings</a> page and configure your **new** storage credentials. Do **not** save the page yet.</li>
+        <li>Return here and click the "Start Migration" button.</li>
+        <li>Wait for the migration to complete. This may take several minutes depending on the number of files.</li>
+        <li>Once successful, return to the settings page and click "Save Settings" to make the new backend active.</li>
+    </ol>
+
+    <div class="card mt-4">
+        <div class="card-body">
+            <button id="startMigrationBtn" class="btn btn-warning btn-lg">Start File Migration</button>
+            <div id="migrationStatus" class="mt-3"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('startMigrationBtn').addEventListener('click', function() {
+    const btn = this;
+    const statusDiv = document.getElementById('migrationStatus');
+    
+    if (!confirm('This will copy all files from the current storage to the new one configured in settings. Are you sure?')) {
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Migrating...';
+    statusDiv.innerHTML = '<div class="alert alert-info">Migration in progress. Please do not close this window.</div>';
+
+    fetch("{{ url_for('dashboard.storage_migration') }}", {
+        method: "POST"
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.ok) {
+            statusDiv.innerHTML = `<div class="alert alert-success"><strong>Success!</strong> ${data.message}</div>`;
+        } else {
+            statusDiv.innerHTML = `<div class="alert alert-danger"><strong>Error!</strong> ${data.error}</div>`;
+        }
+    })
+    .catch(err => {
+        statusDiv.innerHTML = `<div class="alert alert-danger"><strong>Network Error!</strong> Could not complete migration.</div>`;
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = 'Start File Migration';
+    });
+});
+</script>
+{% endblock %}

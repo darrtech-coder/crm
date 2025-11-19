@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Manage Modules — {{ course.title }}</h2>
+    <a class="btn btn-secondary" href="{{ url_for('academy.admin_index') }}">&larr; Back to Courses</a>
+  </div>
+
+  <div class="row">
+    <!-- Left: Existing modules (sortable) -->
+    <div class="col-md-6">
+      <h5>Modules (drag to reorder)</h5>
+      <ul id="modulesList" class="list-group">
+        {% for m in course.items %}
+        <li class="list-group-item d-flex justify-content-between align-items-center" data-id="{{ m.id }}">
+          <div class="d-flex align-items-center gap-2">
+            <span class="text-muted drag-handle" title="Drag to reorder" style="cursor:grab;">☰</span>
+            <span class="badge bg-secondary">{{ m.position }}</span>
+            {% if m.type == "library" %}
+              <span>📘 {{ m.library_item.title if m.library_item else "(deleted item)" }}</span>
+            {% else %}
+              <span>🧪 {{ m.test.title if m.test else "(deleted test)" }}</span>
+              {% if m.pass_percent %}<span class="badge bg-info ms-2">Pass ≥ {{ m.pass_percent }}%</span>{% endif %}
+              {% if m.require_review %}<span class="badge bg-warning ms-2">Requires review</span>{% endif %}
+            {% endif %}
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <!-- Fallback: move up/down -->
+            <form method="POST" action="{{ url_for('academy.module_move', course_id=course.id, item_id=m.id) }}">
+              <input type="hidden" name="dir" value="up">
+              <button class="btn btn-sm btn-outline-secondary" title="Move up">↑</button>
+            </form>
+            <form method="POST" action="{{ url_for('academy.module_move', course_id=course.id, item_id=m.id) }}">
+              <input type="hidden" name="dir" value="down">
+              <button class="btn btn-sm btn-outline-secondary" title="Move down">↓</button>
+            </form>
+            <form method="POST" action="{{ url_for('academy.module_delete', course_id=course.id, item_id=m.id) }}"
+                  onsubmit="return confirm('Remove this module?');">
+              <button class="btn btn-sm btn-outline-danger">Delete</button>
+            </form>
+          </div>
+        </li>
+        {% else %}
+          <li class="list-group-item text-muted">No modules yet — add one on the right.</li>
+        {% endfor %}
+      </ul>
+      <small class="text-muted d-block mt-2">Tip: Drag rows to reorder (or use ↑/↓).</small>
+    </div>
+
+    <!-- Right: Add module -->
+    <div class="col-md-6">
+      <h5>Add Module</h5>
+
+      <!-- Add Library Module -->
+      <div class="card mb-3">
+        <div class="card-body">
+          <h6 class="card-title">Add Library Item</h6>
+          <form method="POST">
+            <input type="hidden" name="type" value="library">
+            <input type="hidden" id="lib_id" name="library_item_id">
+            <div class="position-relative mb-2">
+              <input id="lib_search" class="form-control" placeholder="Search library items…">
+              <div id="lib_results" class="list-group position-absolute w-100" style="z-index:1000; display:none;"></div>
+            </div>
+            <div id="lib_selected" class="mb-2 small text-muted"></div>
+            <button class="btn btn-primary" disabled id="lib_add_btn">Add Library Module</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Add Test Module -->
+      <div class="card">
+        <div class="card-body">
+          <h6 class="card-title">Add Test</h6>
+          <form method="POST">
+            <input type="hidden" name="type" value="test">
+            <input type="hidden" id="test_id" name="test_id">
+            <div class="position-relative mb-2">
+              <input id="test_search" class="form-control" placeholder="Search tests…">
+              <div id="test_results" class="list-group position-absolute w-100" style="z-index:999; display:none;"></div>
+            </div>
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label">Pass percent</label>
+                <input type="number" class="form-control" name="pass_percent" min="0" max="100" value="0">
+              </div>
+              <div class="col-md-6 d-flex align-items-end">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="req_rev" name="require_review">
+                  <label class="form-check-label" for="req_rev">Require manager review</label>
+                </div>
+              </div>
+            </div>
+            <div id="test_selected" class="mb-2 small text-muted mt-2"></div>
+            <button class="btn btn-primary" disabled id="test_add_btn">Add Test Module</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- SortableJS for drag-and-drop -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+function enableSearch(boxId, resultsId, url, onPick){
+  const box = document.getElementById(boxId);
+  const results = document.getElementById(resultsId);
+  box.addEventListener("input", ()=>{
+    const q = box.value.trim();
+    if(q.length < 2){ results.style.display="none"; results.innerHTML=""; return; }
+    fetch(url + "?q=" + encodeURIComponent(q)).then(r=>r.json()).then(data=>{
+      results.innerHTML="";
+      if(!data.length){ results.style.display="none"; return; }
+      data.forEach(row=>{
+        const a = document.createElement("a");
+        a.className = "list-group-item list-group-item-action";
+        a.href="#"; a.textContent = row.title || row.text || "(untitled)";
+        a.addEventListener("click", (e)=>{
+          e.preventDefault();
+          results.style.display="none"; results.innerHTML="";
+          onPick(row);
+          box.value = "";
+        });
+        results.appendChild(a);
+      });
+      results.style.display = "block";
+    });
+  });
+}
+
+// Library search
+enableSearch("lib_search", "lib_results", "{{ url_for('academy.search_library_items') }}", row=>{
+  document.getElementById("lib_id").value = row.id;
+  document.getElementById("lib_selected").textContent = "Selected: " + (row.title || row.text);
+  document.getElementById("lib_add_btn").disabled = false;
+});
+
+// Test search
+enableSearch("test_search", "test_results", "{{ url_for('academy.search_tests') }}", row=>{
+  document.getElementById("test_id").value = row.id;
+  document.getElementById("test_selected").textContent = "Selected: " + (row.title || row.text);
+  document.getElementById("test_add_btn").disabled = false;
+});
+
+// Drag/drop reorder
+const list = document.getElementById("modulesList");
+if(list){
+  new Sortable(list, {
+    handle: ".drag-handle",
+    animation: 150,
+    onEnd: function(){
+      const order = Array.from(list.querySelectorAll("li[data-id]")).map(li=>parseInt(li.dataset.id));
+      fetch("{{ url_for('academy.modules_reorder', course_id=course.id) }}", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ order })
+      }).then(()=> location.reload());
+    }
+  });
+}
+</script>
+{% endblock %}

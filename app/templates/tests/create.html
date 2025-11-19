@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Create Test</h2>
+  <form method="POST">
+    <div class="mb-3">
+      <label class="form-label">Title</label>
+      <input type="text" class="form-control" name="title" placeholder="Test title" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Description</label>
+      <textarea class="form-control" name="description"></textarea>
+    </div>
+    {# -------------------- [START] Add Time Limit Field -------------------- #}
+    <div class="mb-3">
+        <label class="form-label">Time Limit (in minutes)</label>
+        <input type="number" class="form-control" name="time_limit" min="0" placeholder="Leave blank for no limit">
+    </div>
+    {# -------------------- [END] Add Time Limit Field -------------------- #}
+    <button type="submit" class="btn btn-success">Create</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Add Quiz Question</h2>
+  <form method="POST">
+    <div class="mb-3">
+      <label class="form-label">Question</label>
+      <input type="text" name="question" class="form-control" required>
+    </div>
+
+    <h5>Options</h5>
+    <div id="options-container">
+      <div class="option mb-2 input-group">
+        <input type="text" name="option" class="form-control" placeholder="Option text">
+        <span class="input-group-text">
+          <input type="checkbox" name="is_correct"> Correct
+        </span>
+      </div>
+    </div>
+    <button type="button" class="btn btn-outline-secondary btn-sm mb-3" onclick="addOption()">+ Add Option</button>
+
+    <button type="submit" class="btn btn-success">Save Question</button>
+    <a href="{{ url_for('library.view_item', item_id=item_id) }}" class="btn btn-secondary">Cancel</a>
+  </form>
+</div>
+
+<script>
+function addOption(){
+  const container = document.getElementById("options-container");
+  const div = document.createElement("div");
+  div.className = "option mb-2 input-group";
+  div.innerHTML = `
+    <input type="text" name="option" class="form-control" placeholder="Option text">
+    <span class="input-group-text">
+      <input type="checkbox" name="is_correct"> Correct
+    </span>`;
+  container.appendChild(div);
+}
+</script>
+{% endblock %}

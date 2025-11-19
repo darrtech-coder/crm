@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <a href="{{ url_for('library.index') }}" class="btn btn-secondary mb-3">&larr; Back</a>
+      <h2 class="card-title">Upload New Library Item</h2>
+      <p class="text-muted">Managers/Admins can upload PDFs, Word docs, images, videos, or audio, and optionally attach multiple files.</p>
+
+      <form method="POST" enctype="multipart/form-data">
+        <!-- Title -->
+        <div class="mb-3">
+          <label class="form-label">Title</label>
+          <input class="form-control" name="title" placeholder="Enter article title (or leave blank to auto-fill from filename)" required>
+        </div>
+
+        <!-- Thumbnail -->
+        <div class="mb-3">
+          <label class="form-label">Thumbnail (optional)</label>
+          <input type="file" class="form-control" name="thumbnail" accept="image/*">
+          <small class="text-muted">If not provided, a thumbnail will be auto-generated for videos, images, and PDFs.</small>
+        </div>
+
+        <!-- Description -->
+        <div class="mb-3">
+          <label class="form-label">Description</label>
+          <textarea class="form-control" name="description" placeholder="Add a short description"></textarea>
+        </div>
+
+        <!-- Keywords -->
+        <div class="mb-3">
+          <label class="form-label">Keywords</label>
+          <input class="form-control" name="keywords" placeholder="e.g. onboarding, sales, compliance">
+        </div>
+
+        <!-- Category -->
+        <div class="mb-3">
+          <label class="form-label">Category</label>
+          <select name="category_id" class="form-select">
+            <option value="">-- No Category --</option>
+            {% for c in categories %}
+              <option value="{{ c.id }}">{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Main File -->
+        <div class="mb-3">
+          <label class="form-label">Main File *</label>
+          <input type="file" class="form-control" id="mainFile" name="file" required>
+          <small class="text-muted">This will be the primary document, video, or audio file.</small>
+        </div>
+
+        <!-- Attachments -->
+        <div class="mb-3">
+          <label class="form-label">Additional Attachments</label>
+          <input type="file" class="form-control" name="attachments" multiple>
+          <small class="text-muted">You may attach extra resources (PDFs, slides, multimedia).</small>
+        </div>
+
+        <!-- Access Control Checkboxes -->
+        <div class="form-check">
+          <input type="checkbox" class="form-check-input" name="manager_only" id="manager_only">
+          <label class="form-check-label" for="manager_only">Manager-only Content</label>
+        </div>
+        <div class="form-check mb-3">
+          <input type="checkbox" class="form-check-input" name="unlisted" id="unlisted" {% if item.unlisted %}checked{% endif %}>
+          <label class="form-check-label" for="unlisted">Unlisted (hidden from listings; direct link only)</label>
+        </div>
+
+        <!-- Access Restriction Tagging UI -->
+        <div class="mb-3 p-3 border rounded">
+            <label class="form-label fw-bold">Restrict Access (Optional)</label>
+            <p class="small text-muted">If empty, this item is accessible to all non-manager roles. If you add anyone, it becomes restricted *only* to them.</p>
+
+            <!-- Team Search & Tags -->
+            <div>
+                <label class="form-label">Restrict to Teams</label>
+                <div class="position-relative">
+                    <input type="text" class="form-control" id="team-search-box" placeholder="Search for teams to add...">
+                    <div class="list-group position-absolute w-100" id="team-search-results" style="z-index: 1001;"></div>
+                </div>
+                <div id="selected-teams" class="mt-2 d-flex flex-wrap gap-2"></div>
+            </div>
+
+            <!-- User Search & Tags -->
+            <div class="mt-3">
+                <label class="form-label">Restrict to Specific Users</label>
+                <div class="position-relative">
+                    <input type="text" class="form-control" id="user-search-box" placeholder="Search by name, username, or email...">
+                    <div class="list-group position-absolute w-100" id="user-search-results" style="z-index: 1000;"></div>
+                </div>
+                <div id="selected-users" class="mt-2 d-flex flex-wrap gap-2"></div>
+                <input type="hidden" name="user_ids" id="user_ids_hidden">
+            </div>
+        </div>
+
+        <!-- Prerequisites Tagging UI -->
+        <div class="mt-3 p-3 border rounded">
+            <label class="form-label fw-bold">Prerequisites (Optional)</label>
+            <p class="small text-muted">Select other library items that must be viewed before this one.</p>
+            <div class="position-relative">
+                <input type="text" class="form-control" id="prereq-search" placeholder="Search for prerequisite items…">
+                <div id="prereq-results" class="list-group position-absolute w-100" style="z-index:1000;"></div>
+            </div>
+            <div id="selected-prereqs" class="mt-2 d-flex flex-wrap gap-2"></div>
+            <input type="hidden" name="prereq_item_ids" id="prereq_item_ids">
+        </div>
+
+        <div class="d-grid mt-4">
+          <button type="submit" class="btn btn-success btn-lg">Upload Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// --- Auto-fill title from filename ---
+document.addEventListener("DOMContentLoaded", function() {
+  const fileInput = document.getElementById("mainFile");
+  const titleInput = document.querySelector('input[name="title"]');
+  if (fileInput && titleInput) {
+    fileInput.addEventListener("change", function() {
+      if (this.files.length > 0) {
+        const fileName = this.files[0].name;
+        const baseName = fileName.replace(/\.[^/.]+$/, ""); // strip extension
+        if (!titleInput.value.trim()) {
+          titleInput.value = baseName;
+        }
+      }
+    });
+  }
+});
+
+// --- Team Tagging UI ---
+(function() {
+    const teamSearchBox = document.getElementById("team-search-box");
+    const teamSearchResults = document.getElementById("team-search-results");
+    const selectedTeamsContainer = document.getElementById("selected-teams");
+    
+    function addTeamTag(teamId, teamName) {
+        if (selectedTeamsContainer.querySelector(`input[value="${teamId}"]`)) return;
+        const tag = document.createElement("span");
+        tag.className = "badge bg-info text-dark d-flex align-items-center";
+        tag.innerHTML = `
+            ${teamName}
+            <button type="button" class="btn-close ms-2" data-team-id="${teamId}"></button>
+            <input type="hidden" name="team_ids" value="${teamId}">
+        `;
+        tag.querySelector('.btn-close').addEventListener('click', function() { tag.remove(); });
+        selectedTeamsContainer.appendChild(tag);
+    }
+
+    teamSearchBox.addEventListener("input", function() {
+        const query = teamSearchBox.value.trim();
+        if (query.length < 1 && query !== '') { teamSearchResults.innerHTML = ""; return; }
+        fetch(`{{ url_for('library.search_teams') }}?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                teamSearchResults.innerHTML = "";
+                data.forEach(team => {
+                    const item = document.createElement("a");
+                    item.href = "#";
+                    item.className = "list-group-item list-group-item-action";
+                    item.textContent = team.text;
+                    item.addEventListener("click", function(e) {
+                        e.preventDefault();
+                        addTeamTag(team.id, team.text);
+                        teamSearchBox.value = "";
+                        teamSearchResults.innerHTML = "";
+                    });
+                    teamSearchResults.appendChild(item);
+                });
+            });
+    });
+})();
+
+// --- User Tagging UI ---
+(function() {
+    const searchBox = document.getElementById("user-search-box");
+    const searchResults = document.getElementById("user-search-results");
+    const selectedUsersContainer = document.getElementById("selected-users");
+    const hiddenInput = document.getElementById("user_ids_hidden");
+    let selectedIds = new Set();
+
+    function updateHiddenInput() { hiddenInput.value = Array.from(selectedIds).join(','); }
+
+    function addUserTag(userId, userText) {
+        if (selectedIds.has(userId)) return;
+        selectedIds.add(userId);
+        const tag = document.createElement("span");
+        tag.className = "badge bg-primary d-flex align-items-center";
+        tag.innerHTML = `${userText} <button type="button" class="btn-close btn-close-white ms-2"></button>`;
+        tag.querySelector('.btn-close').addEventListener('click', function() {
+            selectedIds.delete(userId);
+            tag.remove();
+            updateHiddenInput();
+        });
+        selectedUsersContainer.appendChild(tag);
+        updateHiddenInput();
+    }
+
+    searchBox.addEventListener("input", function() {
+        const query = searchBox.value.trim();
+        if (query.length < 2) { searchResults.innerHTML = ""; return; }
+        fetch(`{{ url_for('library.search_users') }}?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                searchResults.innerHTML = "";
+                data.forEach(user => {
+                    const item = document.createElement("a");
+                    item.href = "#";
+                    item.className = "list-group-item list-group-item-action";
+                    item.textContent = user.text;
+                    item.addEventListener("click", function(e) {
+                        e.preventDefault();
+                        addUserTag(user.id, user.text);
+                        searchBox.value = "";
+                        searchResults.innerHTML = "";
+                    });
+                    searchResults.appendChild(item);
+                });
+            });
+    });
+})();
+
+// --- Prerequisite Tagging UI ---
+(function(){
+  const box = document.getElementById("prereq-search");
+  const out = document.getElementById("prereq-results");
+  const sel = document.getElementById("selected-prereqs");
+  const hid = document.getElementById("prereq_item_ids");
+
+  function getIds(){ return (hid.value || "").split(",").filter(Boolean).map(x => parseInt(x)); }
+  function setIds(arr){ hid.value = arr.join(","); }
+
+  window.removePrereq = function(id){
+    setIds(getIds().filter(x => x !== id));
+    sel.querySelector(`span.badge[data-id="${id}"]`)?.remove();
+    box.disabled = false;
+  }
+
+  box.addEventListener("input", ()=>{
+    const q = box.value.trim();
+    if(q.length < 2){ out.innerHTML = ""; return; }
+    fetch(`{{ url_for('library.search_library_items_for_prereq') }}?q=` + encodeURIComponent(q))
+      .then(r=>r.json()).then(rows => {
+        out.innerHTML = "";
+        rows.forEach(row => {
+          if(getIds().includes(row.id)) return;
+          const a = document.createElement("a");
+          a.href="#";
+          a.className = "list-group-item list-group-item-action";
+          a.textContent = row.title;
+          a.onclick = (e) => {
+            e.preventDefault();
+            const tag = document.createElement("span");
+            tag.className = "badge bg-dark d-flex align-items-center";
+            tag.dataset.id = row.id;
+            tag.innerHTML = `${row.title}<button type="button" class="btn-close btn-close-white ms-2" onclick="removePrereq(${row.id})"></button>`;
+            sel.appendChild(tag);
+            setIds([...getIds(), row.id]);
+            out.innerHTML = "";
+            box.value = "";
+            if (getIds().length >= 2) { box.disabled = true; }
+          };
+          out.appendChild(a);
+        });
+      });
+  });
+})();
+</script>
+
+{% endblock %}

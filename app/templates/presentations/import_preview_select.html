@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4">📥 Import Selected Presentations</h2>
+  <form method="POST" action="{{ url_for('presentations.import_selected_process') }}">
+    <input type="hidden" name="file_path" value="{{ file_path }}">
+
+    <div class="d-flex justify-content-end gap-2 mb-3">
+      <button type="button" class="btn btn-sm btn-outline-primary" onclick="toggleAll()">Select All</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="invertSelection()">Invert</button>
+    </div>
+
+    <div class="row">
+      {% for pres in presentations %}
+      <div class="col-md-4 mb-4">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <h5 class="card-title">
+              <input class="form-check-input me-2 pres-check" type="checkbox" name="presentation_ids" value="{{ pres.id }}">
+              {{ pres.title }}
+            </h5>
+            <p class="card-text text-muted mb-1"><i class="bi bi-images"></i> {{ pres.slide_count }} slides</p>
+            <p class="small text-muted mb-0">Backup created: {{ pres.created_at }}</p>
+            {% if pres.restricted_to_managers %}
+              <span class="badge bg-warning mt-2">Manager Only</span>
+            {% endif %}
+            {% if pres.teams %}
+              <span class="badge bg-info mt-2">Teams: {{ pres.teams|join(', ') }}</span>
+            {% endif %}
+            {% if pres.users %}
+              <span class="badge bg-secondary mt-2">Users: {{ pres.users|join(', ') }}</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <p class="text-muted">No presentations in backup</p>
+      {% endfor %}
+    </div>
+
+    <div class="mt-3">
+      <button type="submit" class="btn btn-success">✅ Import Selected</button>
+      <a class="btn btn-secondary" href="{{ url_for('presentations.index') }}">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+let allSelected = false;
+function toggleAll() {
+  document.querySelectorAll(".pres-check").forEach(cb => cb.checked = !allSelected);
+  allSelected = !allSelected;
+  document.querySelector('button[onclick="toggleAll()"]').textContent = allSelected ? "Deselect All" : "Select All";
+}
+function invertSelection() {
+  document.querySelectorAll(".pres-check").forEach(cb => cb.checked = !cb.checked);
+}
+</script>
+{% endblock %}

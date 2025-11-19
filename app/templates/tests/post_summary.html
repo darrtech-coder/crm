@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>🏁 Test Summary — {{ test.title }}</h2>
+  <p class="text-muted">Submitted on {{ submission.submitted_at | tz("%Y-%m-%d %H:%M") }}</p>
+
+  <!-- Basic stats -->
+  <table class="table table-bordered w-auto">
+    <tr><th>Total Questions</th><td>{{ total_questions }}</td></tr>
+    <tr><th>Average Score (all users)</th><td>{{ "%.1f"|format(avg_score or 0) }}</td></tr>
+    <tr><th>Your Score</th><td>{{ "%.1f"|format(submission.score or 0) }}</td></tr>
+  </table>
+
+  <hr>
+  <h4>⚙️ Score Breakdown</h4>
+  <table class="table table-striped w-auto">
+    <thead>
+      <tr><th></th><th>Min</th><th>Max</th><th>Total Possible</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>MCQ Section</td>
+        <td>{{ "%.1f"|format(min_mcq) }}</td>
+        <td>{{ "%.1f"|format(max_mcq) }}</td>
+        <td>{{ "%.1f"|format(total_possible) }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <hr>
+  <h4>📊 Question Performance</h4>
+  <ul class="list-group">
+    {% for ans in submission.answers %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <div>{{ loop.index }}.&nbsp;{{ ans.question.question }}</div>
+        {% if ans.question.type == "mcq" %}
+          {% if ans.is_correct %}
+            <span class="text-success">✓&nbsp;+5</span>
+          {% else %}
+            <span class="text-danger">✗&nbsp;+0</span>
+          {% endif %}
+        {% elif ans.question.type in ("short_text","audio") %}
+          <span class="text-muted">Manual Score: {{ ans.score or 0 }}</span>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+
+  <div class="mt-4">
+    <a href="{{ url_for('tests.index') }}" class="btn btn-primary">⬅️ Back to Tests</a>
+
+  </div>
+  <div class="mt-4">
+<button class="btn btn-outline-info mt-3" onclick="refreshResults()">🔄 Refresh Results</button>
+  </div>
+
+</div>
+
+
+
+
+<script>
+const subId = {{ submission.id }};
+async function refreshResults(){
+  try{
+    const res = await fetch(`/tests/submission/${subId}/result_data`);
+    const data = await res.json();
+
+    // Update core stats
+    document.querySelector("#yourScore").textContent = data.your_score;
+    document.querySelector("#avgScore").textContent = data.avg_score;
+
+    // Optionally rebuild per-question list if you want
+    const list = document.querySelector("#answersList");
+    if(list){ 
+      list.innerHTML = "";
+      data.answers.forEach(a=>{
+        const li = document.createElement("li");
+        li.className = "list-group-item d-flex justify-content-between align-items-center";
+        li.innerHTML = `
+          <div>${a.index}. ${a.text}</div>
+          ${
+            a.type === "mcq"
+              ? (a.is_correct ? '<span class="text-success">✓ +5</span>' : '<span class="text-danger">✗ +0</span>')
+              : `<span class="text-muted">Manual Score: ${a.score}</span>`
+          }`;
+        list.appendChild(li);
+      });
+    }
+  }catch(e){ console.warn("Auto‑refresh failed", e); }
+}
+
+// every 10 seconds check for updated marks
+setInterval(refreshResults, 10000);
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) refreshResults(); });
+</script>
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>🏁 Live Results — {{ test.title }}</h2>
+  <p class="text-muted">
+    Submission by <strong>{{ submission.user.username }}</strong>
+    | {{ submission.submitted_at.strftime("%Y‑%m‑%d %H:%M") }}
+  </p>
+
+  <!-- Score Summary -->
+  <table class="table table-bordered w-auto">
+    <tr><th>Total Questions</th><td id="totalQ">{{ total_questions }}</td></tr>
+    <tr><th>Average Score (all users)</th><td id="avgScore">{{ "%.1f"|format(avg_score or 0) }}</td></tr>
+    <tr><th>Your Score</th><td id="yourScore">{{ "%.1f"|format(submission.score or 0) }}</td></tr>
+    <tr><th>Percent</th><td id="percentScore">–</td></tr>
+  </table>
+
+  <div class="mt-3 d-flex align-items-center gap-3">
+    <button id="refreshBtn" class="btn btn-outline-info">🔄 Refresh</button>
+    <span id="lastUpdated" class="text-muted small"></span>
+  </div>
+
+  <hr>
+  <h4>📊 Question Performance</h4>
+  <ul class="list-group" id="answersList">
+    {% for ans in submission.answers %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <div>{{ loop.index }}.&nbsp;{{ ans.question.question }}</div>
+        {% if ans.question.type == "mcq" %}
+          {% if ans.is_correct %}
+            <span class="text-success">✓ +5</span>
+          {% else %}
+            <span class="text-danger">✗ +0</span>
+          {% endif %}
+        {% elif ans.question.type in ("short_text","audio") %}
+          <span class="text-muted">Manual Score: {{ ans.score or 0 }}</span>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+
+  <div class="mt-4">
+    <a href="{{ url_for('tests.index') }}" class="btn btn-primary">⬅ Back to Tests</a>
+  </div>
+</div>
+
+<script>
+(function(){
+  const submissionId = {{ submission.id }};
+  const refreshMs = 10000;  // 10 seconds
+
+  async function refreshResults(){
+    try{
+      const res = await fetch(`/tests/submission/${submissionId}/result_data`);
+      if(!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+
+      // ---- update summary cells ----
+      const qs = sel=>document.querySelector(sel);
+      qs("#totalQ").textContent   = data.total_questions;
+      qs("#avgScore").textContent = data.avg_score;
+      qs("#yourScore").textContent = data.your_score;
+      qs("#percentScore").textContent = data.percent + "%";
+
+      // ---- rebuild question list ----
+      const list = qs("#answersList");
+      list.innerHTML = "";
+      data.answers.forEach(a=>{
+        const li = document.createElement("li");
+        li.className = "list-group-item d-flex justify-content-between align-items-center";
+        li.innerHTML = `
+          <div>${a.index}. ${a.text}</div>
+          ${
+            a.type === "mcq"
+              ? (a.is_correct ? '<span class="text-success">✓ +5</span>' : '<span class="text-danger">✗ +0</span>')
+              : `<span class="text-muted">Manual Score: ${a.score}</span>`
+          }
+        `;
+        list.appendChild(li);
+      });
+
+      const ts = document.getElementById("lastUpdated");
+      if(ts){ ts.textContent = "Last updated " + new Date().toLocaleTimeString(); }
+
+    }catch(err){
+      console.warn("Refresh failed → ", err);
+      const ts = document.getElementById("lastUpdated");
+      if(ts){ ts.textContent = "⚠ Refresh error — " + new Date().toLocaleTimeString(); }
+    }
+  }
+
+  // manual + auto refresh + focus comeback
+  document.getElementById("refreshBtn").addEventListener("click", refreshResults);
+  setInterval(refreshResults, refreshMs);
+  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) refreshResults(); });
+
+  // initial auto-run
+  refreshResults();
+})();
+</script>
+{% endblock %}

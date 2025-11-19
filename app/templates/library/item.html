@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <a href="{{ url_for('library.index') }}" class="btn btn-secondary mb-3">&larr; Back to Library</a>
+  <h2>{{ item.title }}</h2>
+
+  {% if current_user.is_authenticated and current_user.role in ["MANAGER","ADMIN","SUPER_ADMIN"] %}
+    <div class="mb-3">
+        <a href="{{ url_for('library.edit_item', item_id=item.id) }}" class="btn btn-warning btn-sm">Edit</a>
+        <form method="POST" action="{{ url_for('library.archive_item', item_id=item.id) }}" style="display:inline;">
+          <button class="btn btn-outline-secondary btn-sm" onclick="return confirm('Archive this item?')">Archive</button>
+        </form>
+        {% if current_user.role in ["ADMIN","SUPER_ADMIN"] %}
+        <form method="POST" action="{{ url_for('library.delete_item', item_id=item.id) }}" style="display:inline;">
+          <button class="btn btn-danger btn-sm" onclick="return confirm('Delete permanently? This will remove all associated files from storage.')">Delete</button>
+        </form>
+        {% endif %}
+    </div>
+  {% endif %}
+  
+  <!-- Content Embed -->
+  {% include "library/_content_embed.html" %}
+
+  <p class="mt-3 lead">{{ item.description }}</p>
+
+  <!-- Feedback, FAQ, Quiz, and Bias Control Sections -->
+  <div class="row mt-5">
+    <div class="col-md-6">
+      <h3 class="mt-4">📝 Feedback</h3>
+      <form method="POST" action="{{ url_for('library.feedback', item_id=item.id) }}" class="mb-3">
+        <!-- Star rating inputs -->
+        <div class="mb-2">
+          <label class="form-label me-2">Easy:</label>
+          <div class="star-rating">{% for i in range(5,0,-1) %}<input type="radio" id="easy{{i}}" name="easy" value="{{i}}"><label for="easy{{i}}">★</label>{% endfor %}</div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label me-2">Complete:</label>
+          <div class="star-rating">{% for i in range(5,0,-1) %}<input type="radio" id="complete{{i}}" name="complete" value="{{i}}"><label for="complete{{i}}">★</label>{% endfor %}</div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label me-2">Overall:</label>
+          <div class="star-rating">{% for i in range(5,0,-1) %}<input type="radio" id="overall{{i}}" name="overall" value="{{i}}"><label for="overall{{i}}">★</label>{% endfor %}</div>
+        </div>
+        {% if item.allow_comments %}
+        <div class="mb-3"><label class="form-label">Comment:</label><textarea class="form-control" name="comment"></textarea></div>
+        {% endif %}
+        <button class="btn btn-primary">Submit Rating</button>
+      </form>
+
+      {% if item.ratings %}
+        {% set total_ratings = item.ratings|length %}
+        {% if total_ratings > 0 %}
+            {% set avg_easy = (item.ratings|map(attribute='easy')|select('defined')|sum) / (item.ratings|selectattr('easy', 'defined')|list|length or 1) %}
+            {% set avg_complete = (item.ratings|map(attribute='complete')|select('defined')|sum) / (item.ratings|selectattr('complete', 'defined')|list|length or 1) %}
+            {% set avg_overall = (item.ratings|map(attribute='overall')|select('defined')|sum) / (item.ratings|selectattr('overall', 'defined')|list|length or 1) %}
+        {% endif %}
+      {% endif %}
+
+      {% macro show_stars(value) %}
+        {% set rounded = (value * 2)|round / 2 %}
+        <span class="stars">
+          {% for i in range(1,6) %}
+            {% if i <= rounded %}<i class="bi bi-star-fill text-warning"></i>{% elif i - 0.5 == rounded %}<i class="bi bi-star-half text-warning"></i>{% else %}<i class="bi bi-star text-muted"></i>{% endif %}
+          {% endfor %}
+        </span>
+      {% endmacro %}
+
+      <h4 class="mt-4">Reviews</h4>
+      {% if item.ratings %}
+        <div class="mb-3">
+          <strong>Easy:</strong> {{ show_stars(avg_easy) }} ({{ "%.1f"|format(avg_easy) }})<br>
+          <strong>Complete:</strong> {{ show_stars(avg_complete) }} ({{ "%.1f"|format(avg_complete) }})<br>
+          <strong>Overall:</strong> {{ show_stars(avg_overall) }} ({{ "%.1f"|format(avg_overall) }})
+        </div>
+        <div class="border rounded p-2 bg-light" style="max-height:250px; overflow-y:auto;">
+          {% set comments = item.ratings|selectattr("comment")|list %}
+          {% if comments %}
+            {% for r in comments %}
+              <div class="mb-2 pb-2 border-bottom small">
+                <strong>{{ r.user.username or r.user.email }}</strong>
+                <span class="text-muted">({{ r.created_at|tz("%Y-%m-%d") }})</span><br>
+                {{ r.comment }}
+              </div>
+            {% endfor %}
+          {% else %}
+            <p class="text-muted">No comments left yet.</p>
+          {% endif %}
+        </div>
+      {% else %}
+        <p class="text-muted">No feedback yet</p>
+      {% endif %}
+
+    </div>
+    <div class="col-md-6">
+        <h3 class="mt-4">❓ FAQs</h3>
+        <ul class="list-group list-group-flush">
+          {% for f in item.faqs %}<li class="list-group-item"><b>{{ f.question }}</b>: {{ f.answer }}</li>{% else %}<li class="list-group-item text-muted">No FAQs yet.</li>{% endfor %}
+        </ul>
+        {% if current_user.role in ["MANAGER","ADMIN","SUPER_ADMIN"] %}
+        <form method="POST" action="{{ url_for('library.add_faq', item_id=item.id) }}" class="mt-2">
+          <input class="form-control mb-2" name="question" placeholder="Question" required>
+          <textarea class="form-control mb-2" name="answer" placeholder="Answer" required></textarea>
+          <button type="submit" class="btn btn-success">Add FAQ</button>
+        </form>
+        {% endif %}
+    </div>
+  </div>
+
+  <style>.star-rating { direction: rtl; display: inline-flex; } .star-rating input[type=radio] { display: none; } .star-rating label { font-size: 1.5rem; color: #ccc; cursor: pointer; } .star-rating input:checked ~ label { color: gold; } .star-rating label:hover, .star-rating label:hover ~ label { color: gold; }</style>
+
+ <!-- 📝 Quiz -->
+  <h3 class="mt-4">Quiz</h3>
+  <form method="POST" action="{{ url_for('library.quiz_submit', item_id=item.id) }}">
+    {% for q in item.quiz_questions %}
+      <p><strong>{{ q.question }}</strong></p>
+      {% for opt in q.options %}
+      <div>
+        <label><input type="radio" name="q{{ q.id }}" value="{{ opt.id }}"> {{ opt.text }}</label>
+      </div>
+      {% endfor %}
+    {% endfor %}
+    <button type="submit" class="btn btn-primary mt-2">Submit Quiz</button>
+  </form>
+  {% if current_user.role in ["MANAGER","ADMIN","SUPER_ADMIN"] %}
+    <a class="btn btn-outline-success mt-3" href="{{ url_for('library.add_quiz_question', item_id=item.id) }}">Add Quiz Question</a>
+  {% endif %}
+
+
+ <!-- ⚖️ Bias control -->
+  {% if current_user.role in ["ADMIN","SUPER_ADMIN"] %}
+  <h4 class="mt-4">Bias Control</h4>
+  <form method="POST" action="{{ url_for('library.set_bias', item_id=item.id) }}" class="mb-2">
+    <div class="input-group">
+      <input class="form-control" type="number" step="0.1" name="bias" value="{{ item.bias_weight }}">
+      <button class="btn btn-outline-primary">Set Global Bias</button>
+    </div>
+  </form>
+  <form method="POST" action="{{ url_for('library.set_team_bias', item_id=item.id) }}" class="mb-2">
+    <div class="input-group">
+      <select class="form-select" name="team_id">
+        {% for t in all_teams %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+      </select>
+      <input class="form-control" type="number" step="0.1" name="bias" placeholder="weight">
+      <button class="btn btn-outline-secondary">Set Team Bias</button>
+    </div>
+  </form>
+  <form method="POST" action="{{ url_for('library.set_user_bias', item_id=item.id) }}">
+    <div class="input-group">
+      <input class="form-control" type="number" name="user_id" placeholder="User ID">
+      <input class="form-control" type="number" step="0.1" name="bias" placeholder="weight">
+      <button class="btn btn-outline-secondary">Set User Bias</button>
+    </div>
+  </form>
+  {% endif %}
+
+
+</div>
+
+<style>
+ /* Try to keep native volume visible in WebKit (Desktop) */
+.media-player::-webkit-media-controls-volume-slider { display: inline-block !important; } 
+.media-player::-webkit-media-controls-volume-control-container { display: inline-block !important; } 
+.media-player::-webkit-media-controls-mute-button { display: inline-block !important; } 
+.media-player::-webkit-media-controls-enclosure { background-color: transparent !important; } 
+.media-player::-webkit-media-controls-panel { background: rgba(0,0,0,.2) !important; } 
+/* Custom overlay (desktop only; iOS will skip) */ 
+.media-player-wrap { position: relative; display: block; width: 100%; } 
+.media-vol { position: absolute; right: 12px; bottom: 12px; z-index: 4; display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,.55); color: #fff; border-radius: 18px; padding: 6px 10px; backdrop-filter: blur(1px); } 
+.media-vol button { border: none; background: transparent; color: #fff; cursor: pointer; font-size: 16px; line-height: 1; } 
+.media-vol input[type=range] { width: 120px; accent-color: #0d6efd; } 
+@media (max-width: 520px) { 
+	.media-vol input[type=range] { width: 80px; } 
+} 
+</style>
+
+
+<script>
+// --- [NEW] Video Resume and Progress Tracking ---
+(function(){
+  // Only run if a media element is present
+  const media = document.querySelector("video.media-player, audio.media-player");
+  if (!media) return;
+
+  const lastPos = {{ last_pos|int }};
+  const saveUrl = "{{ url_for('library.progress', item_id=item.id) }}";
+  let lastSent = 0;
+
+  // 1. Seek to saved position when metadata is ready
+  function applyResume(){
+    // If near the very end, don't auto-seek (treat as done)
+    if (lastPos && lastPos > 5 && (!media.duration || lastPos < (media.duration - 5))) {
+      try { media.currentTime = lastPos; } catch (e) {}
+    }
+  }
+  // Run on metadata loaded; if already loaded, run immediately
+  media.addEventListener("loadedmetadata", applyResume);
+  if (media.readyState >= 1) { applyResume(); }
+
+  // 2. Function to send progress to the backend
+  function sendProgress(pos, dur, useBeacon=false){
+    const payload = JSON.stringify({
+      position: Math.floor(pos || 0),
+      duration: Math.floor(dur || 0)
+    });
+
+    // Use sendBeacon for unload events, as it's more reliable
+    if (useBeacon && navigator.sendBeacon) {
+      try {
+        const blob = new Blob([payload], {type: "application/json"});
+        navigator.sendBeacon(saveUrl, blob);
+        return;
+      } catch(e) { /* fallback to fetch */ }
+    }
+    
+    // Default to fetch for normal updates
+    fetch(saveUrl, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: payload
+    }).catch(()=>{}); // Ignore network errors
+  }
+
+  // 3. Attach event listeners to the media element
+
+  // Throttle periodic saves to about every 5 seconds during playback
+  media.addEventListener("timeupdate", ()=>{
+    if (!media.duration) return;
+    const now = media.currentTime || 0;
+    if (now - lastSent >= 5) {
+      lastSent = now;
+      sendProgress(now, media.duration);
+    }
+  });
+
+  // Save whenever the user pauses playback
+  media.addEventListener("pause", ()=> {
+    sendProgress(media.currentTime || 0, media.duration || 0);
+  });
+
+  // Save when playback finishes
+  media.addEventListener("ended", ()=> {
+    // Save completion as full duration
+    sendProgress(media.duration || media.currentTime || 0, media.duration || 0);
+  });
+
+  // Save on page unload (best-effort)
+  window.addEventListener("beforeunload", ()=>{
+    sendProgress(media.currentTime || 0, media.duration || 0, true);
+  });
+})();
+
+
+
+
+let start = Date.now();
+window.addEventListener("beforeunload", () => {
+  const duration = Math.round((Date.now() - start) / 1000);
+  navigator.sendBeacon("{{ url_for('library.end_session', item_id=item.id) }}", JSON.stringify({duration: duration}));
+});
+
+
+function reportProgress(pos, dur){
+  fetch("{{ url_for('library.progress', item_id=item.id) }}", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({position: Math.floor(pos), duration: Math.floor(dur)})
+  });
+}
+const media = document.querySelector("video, audio");
+if (media) {
+  let lastSent = 0;
+  media.addEventListener("timeupdate", ()=>{
+    if (media.duration && media.currentTime - lastSent >= 5) {
+      lastSent = media.currentTime;
+      reportProgress(media.currentTime, media.duration);
+    }
+  });
+  media.addEventListener("pause", ()=> reportProgress(media.currentTime, media.duration || 0));
+  media.addEventListener("ended", ()=> reportProgress(media.duration || media.currentTime, media.duration || 0));
+}
+
+
+
+
+(function(){
+  // Only run if a media element is present
+  const media = document.querySelector("video.media-player, audio.media-player");
+  if (!media) return;
+
+  const lastPos = {{ last_pos|int }};
+  const saveUrl = "{{ url_for('library.progress', item_id=item.id) }}";
+  let lastSent = 0;
+
+  // Seek to saved position when metadata is ready
+  function applyResume(){
+    // If near the very end, don't auto-seek (treat as done)
+    if (lastPos && lastPos > 5 && (!media.duration || lastPos < (media.duration - 5))) {
+      try { media.currentTime = lastPos; } catch (e) {}
+    }
+  }
+  // Run on metadata loaded; if already loaded, run immediately
+  media.addEventListener("loadedmetadata", applyResume);
+  if (media.readyState >= 1) { applyResume(); }
+
+  function sendProgress(pos, dur, useBeacon=false){
+    const payload = JSON.stringify({
+      position: Math.floor(pos || 0),
+      duration: Math.floor(dur || 0)
+    });
+    if (useBeacon && navigator.sendBeacon) {
+      try {
+        const blob = new Blob([payload], {type: "application/json"});
+        navigator.sendBeacon(saveUrl, blob);
+        return;
+      } catch(e) {}
+    }
+    fetch(saveUrl, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: payload
+    }).catch(()=>{});
+  }
+
+  // Throttle periodic saves to about every 5 seconds
+  media.addEventListener("timeupdate", ()=>{
+    if (!media.duration) return;
+    const now = media.currentTime || 0;
+    if (now - lastSent >= 5) {
+      lastSent = now;
+      sendProgress(now, media.duration);
+    }
+  });
+
+  // Save whenever the user pauses or ends playback
+  media.addEventListener("pause", ()=> {
+    sendProgress(media.currentTime || 0, media.duration || 0);
+  });
+  media.addEventListener("ended", ()=> {
+    // Save completion as full duration
+    sendProgress(media.duration || media.currentTime || 0, media.duration || 0);
+  });
+
+  // Save on unload (best-effort)
+  window.addEventListener("beforeunload", ()=>{
+    sendProgress(media.currentTime || 0, media.duration || 0, true);
+  });
+})();
+
+
+
+(function(){ // Skip on iOS (no programmatic volume control) const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes('Mac') && 'ontouchend' in document); const media = document.querySelector('#lib-media'); if (!media) return; // If native slider exists and user is happy with it, overlay is optional. // We still inject a small overlay on desktop to ensure there is a visible control. if (isIOS) return; // iOS uses hardware buttons only // Wrap media for overlay if (!media.parentElement.classList.contains('media-player-wrap')) { const wrap = document.createElement('div'); wrap.className = 'media-player-wrap'; media.parentNode.insertBefore(wrap, media); wrap.appendChild(media); } // Build overlay const vol = document.createElement('div'); vol.className = 'media-vol'; const btn = document.createElement('button'); btn.type = 'button'; const slider = document.createElement('input'); slider.type = 'range'; slider.min = '0'; slider.max = '1'; slider.step = '0.01'; // Restore a previous volume if you want persistence (localStorage) const saved = parseFloat(localStorage.getItem('libVolume') || '0.8'); const startVol = isNaN(saved) ? 0.8 : Math.max(0, Math.min(1, saved)); try { media.volume = startVol; } catch(e){} media.muted = (startVol === 0); slider.value = String(media.muted ? 0 : (media.volume || startVol)); btn.textContent = media.muted ? '🔇' : (media.volume > 0.5 ? '🔊' : '🔉'); btn.addEventListener('click', ()=>{ media.muted = !media.muted; if (!media.muted && parseFloat(slider.value) === 0) { slider.value = '0.5'; media.volume = 0.5; localStorage.setItem('libVolume','0.5'); } btn.textContent = media.muted ? '🔇' : (media.volume > 0.5 ? '🔊' : '🔉'); }); slider.addEventListener('input', ()=>{ const v = Math.max(0, Math.min(1, parseFloat(slider.value))); try { media.volume = v; } catch(e){} media.muted = (v === 0); btn.textContent = media.muted ? '🔇' : (v > 0.5 ? '🔊' : '🔉'); }); slider.addEventListener('change', ()=>{ localStorage.setItem('libVolume', slider.value); }); media.addEventListener('volumechange', ()=>{ // Keep overlay in sync if user interacts with native controls const v = media.muted ? 0 : (media.volume || 0); slider.value = String(v); btn.textContent = (v === 0) ? '🔇' : (v > 0.5 ? '🔊' : '🔉'); }); vol.appendChild(btn); vol.appendChild(slider); media.parentElement.appendChild(vol); })(); 
+
+
+
+
+
+(function(){
+  const itemId = {{ item.id }};
+  let started = Date.now(), total = 0, hiddenAt = null;
+
+  function payloadSecs(){ return Math.round((total + (Date.now() - started))/1000); }
+
+  function send(duration){
+    const url = "{{ url_for('library.end_session', item_id=0) }}".replace("0", itemId);
+    const data = JSON.stringify({ duration: duration });
+    try {
+      navigator.sendBeacon(url, data);
+    } catch(e) {
+      fetch(url, {method:"POST", body:data, keepalive:true});
+    }
+  }
+
+  document.addEventListener("visibilitychange", ()=>{
+    if (document.hidden) {
+      total += Date.now() - started;
+      send(Math.round(total/1000));
+      hiddenAt = Date.now();
+    } else {
+      started = Date.now();
+      hiddenAt = null;
+    }
+  });
+
+  window.addEventListener("beforeunload", ()=>{
+    total += Date.now() - started;
+    send(Math.round(total/1000));
+  });
+
+  // heartbeat every 60s
+  setInterval(()=>{
+    const secs = payloadSecs();
+    if (secs > 15) send(secs);
+  }, 60000);
+})();
+
+
+</script>
+
+{% include "library/_session_tracker.html" %}
+
+{% endblock %}

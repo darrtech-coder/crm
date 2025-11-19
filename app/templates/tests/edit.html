@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Edit / Design Test: {{ test.title }}</h2>
+
+  <!-- === Edit Test Metadata === -->
+  <form method="POST">
+    <div class="mb-3">
+      <label class="form-label">Title</label>
+      <input type="text" class="form-control" name="title" value="{{ test.title }}">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Description</label>
+      <textarea class="form-control" name="description"
+        rows="3">{{ test.description }}</textarea>
+    </div>
+
+    <div class="row">
+      <div class="col-md-3 mb-3">
+        <label class="form-label">Time Limit (minutes)</label>
+        <input type="number" min="0" name="time_limit" class="form-control"
+               value="{{ test.time_limit or '' }}"
+               placeholder="Leave blank = unlimited">
+      </div>
+
+      <div class="col-md-3 mb-3">
+        <label class="form-label">Status</label>
+        <select name="status" class="form-select">
+          <option value="draft" {{ "selected" if test.status=="draft" }}>Draft</option>
+          <option value="public" {{ "selected" if test.status=="public" }}>Public</option>
+          <option value="private" {{ "selected" if test.status=="private" }}>Private</option>
+          <option value="scheduled" {{ "selected" if test.status=="scheduled" }}>Scheduled</option>
+          <option value="archived" {{ "selected" if test.status=="archived" }}>Archived</option>
+        </select>
+      </div>
+
+      <div class="col-md-4 mb-3">
+        <label class="form-label">Publish Date (for scheduled)</label>
+        <input type="datetime-local" name="publish_at" class="form-control"
+               value="{{ test.publish_at|default('', true) }}">
+      </div>
+    </div>
+
+    <button class="btn btn-primary mb-3">Save Metadata</button>
+  </form>
+
+  <div class="d-flex gap-2 mb-3">
+    <form method="POST" action="{{ url_for('tests.delete_test', test_id=test.id) }}"
+          onsubmit="return confirm('Delete this test permanently?');">
+      <button class="btn btn-danger btn-sm">Delete Test</button>
+    </form>
+    <form method="POST" action="{{ url_for('tests.archive_test', test_id=test.id) }}">
+      <button class="btn btn-warning btn-sm">Archive</button>
+    </form>
+  </div>
+
+  <hr/>
+
+  <!-- === Questions Section === -->
+  <div class="d-flex justify-content-between align-items-center">
+    <h4>Questions</h4>
+    <a class="btn btn-outline-info"
+       href="{{ url_for('tests.review_submissions', test_id=test.id) }}">
+       Review Submissions
+    </a>
+  </div>
+
+  <div id="questions" class="mt-3">
+    {% if test.questions %}
+      {% for q in test.questions %}
+        <div class="card border-0 shadow-sm p-3 mb-3">
+          <div>
+            <strong>{{ q.type|capitalize }}</strong>:
+            <div class="mt-2">{{ q.question|safe }}</div>
+          </div>
+
+          {% if q.type == 'mcq' %}
+          <ul class="ms-3 mt-2">
+            {% for opt in q.options %}
+              <li>
+                {{ opt.text }}
+                {% if opt.is_correct %}
+                  <span class="badge bg-success">✓ correct</span>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+
+          <div class="mt-3">
+            <a href="{{ url_for('tests.edit_question', qid=q.id) }}"
+               class="btn btn-sm btn-outline-primary">Edit</a>
+
+            <form method="POST" action="{{ url_for('tests.delete_question', qid=q.id) }}"
+                  class="d-inline" onsubmit="return confirm('Delete this question?');">
+              <button class="btn btn-sm btn-outline-danger">Delete</button>
+            </form>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="text-muted">No questions added yet.</p>
+    {% endif %}
+  </div>
+
+  <button class="btn btn-success mt-3" data-bs-toggle="modal"
+          data-bs-target="#addQuestionModal">
+    + Add Question
+  </button>
+
+  <!-- === Add Question Modal === -->
+  <div class="modal fade" id="addQuestionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <form id="qForm" method="POST"
+              action="{{ url_for('tests.add_question', test_id=test.id) }}">
+          <div class="modal-header">
+            <h5 class="modal-title">Add Question</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+
+          <div class="modal-body">
+            <!-- Type selector -->
+            <div class="mb-3">
+              <label class="form-label">Question Type</label>
+              <select class="form-select" name="type" id="qType"
+                      onchange="toggleOptions()">
+                <option value="mcq" selected>Multiple Choice</option>
+                <option value="short_text">Short Text</option>
+                <option value="audio">Audio</option>
+              </select>
+            </div>
+
+            <!-- Question text -->
+            <div class="mb-3">
+              <label class="form-label">Question Text</label>
+              <textarea class="form-control" name="question"
+                        rows="2" placeholder="Enter your question" required></textarea>
+            </div>
+
+            <!-- MCQ options -->
+            <div id="optionsSection">
+              <h6>Options</h6>
+              <div id="optwrap"></div>
+              <button type="button"
+                      class="btn btn-outline-secondary btn-sm"
+                      onclick="addOpt()">+ Add Option</button>
+              <small class="form-text text-muted">
+                Tick ✓ for correct option(s)
+              </small>
+            </div>
+
+            <small class="text-muted d-block mt-3">
+              For short‑text or audio questions, options are hidden automatically.
+            </small>
+          </div>
+
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-success">Save Question</button>
+            <button type="button" class="btn btn-secondary"
+                    data-bs-dismiss="modal">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- === Scripts === -->
+<script>
+function addOpt(){
+  const wrap=document.getElementById("optwrap");
+  const div=document.createElement("div");
+  div.className="input-group mb-2";
+  div.innerHTML=`
+    <input class="form-control" name="option" placeholder="Option text">
+    <span class="input-group-text">
+      <input type="checkbox" name="is_correct" title="Mark as correct"> ✅
+    </span>`;
+  wrap.appendChild(div);
+}
+
+function toggleOptions(){
+  const type=document.getElementById("qType").value;
+  document.getElementById("optionsSection").style.display=
+     (type==="mcq")?"block":"none";
+}
+
+document.getElementById("addQuestionModal")
+  .addEventListener("show.bs.modal",function(){
+    const wrap=document.getElementById("optwrap");
+    wrap.innerHTML="";
+    addOpt();
+    document.getElementById("qType").value="mcq";
+    toggleOptions();
+});
+
+
+// Make sure TinyMCE updates the <textarea> before the form or modal submits
+document.getElementById("qForm").addEventListener("submit", function () {
+  if (typeof tinymce !== "undefined") {
+    tinymce.triggerSave();
+  }
+});
+
+document.addEventListener("submit", e=>{
+  if (window.tinymce) tinymce.triggerSave();
+});
+
+</script>
+{% endblock %}

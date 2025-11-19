@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Manage Categories</h2>
+  <a href="{{ url_for('library.index') }}" class="btn btn-secondary mb-3">&larr; Back</a>
+
+  <!-- Add Category -->
+  <form method="POST" class="mb-4">
+    <div class="input-group">
+      <input type="text" class="form-control" name="name" placeholder="New category" required>
+      <button class="btn btn-success" type="submit">Add</button>
+    </div>
+  </form>
+
+<hr>
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a href="{{ url_for('library.export_categories') }}" class="btn btn-outline-secondary">Export CSV</a>
+  <form method="POST" action="{{ url_for('library.import_categories') }}" enctype="multipart/form-data" class="d-inline-flex gap-2">
+    <input type="file" name="csv" accept=".csv" class="form-control form-control-sm" required>
+    <button class="btn btn-sm btn-primary">Import CSV</button>
+  </form>
+</div>
+
+  <table class="table table-striped">
+    <thead><tr><th>Name</th><th>Actions</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><em>Uncategorized</em></td>
+        <td><span class="text-muted">(default, cannot delete)</span></td>
+      </tr>
+      {% for cat in categories %}
+      <tr>
+        <td>
+          <form method="POST" action="{{ url_for('library.edit_category', cat_id=cat.id) }}" class="d-flex gap-2">
+            <input name="name" class="form-control form-control-sm" value="{{ cat.name }}">
+            <button class="btn btn-sm btn-primary">Save</button>
+          </form>
+        </td>
+        <td>
+          <form method="POST" action="{{ url_for('library.delete_category', cat_id=cat.id) }}" 
+                onsubmit="return confirm('Delete category {{cat.name}}? Items will move to Uncategorized.');">
+            <button class="btn btn-sm btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="2" class="text-muted">No categories yet</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

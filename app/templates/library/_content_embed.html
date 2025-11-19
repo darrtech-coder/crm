@@ -1,0 +1,58 @@
+<div class="card p-3 shadow-sm">
+  <!-- Main file preview -->
+  {% if item.filename %}
+    {% if "video" in item.mime %}
+      <video class="media-player" controls style="width:100%">
+        <source src="{{ storage.get_url(item.filename) }}" type="{{ item.mime }}">
+      </video>
+    {% elif "audio" in item.mime %}
+      <audio class="media-player" controls style="width:100%">
+        <source src="{{ storage.get_url(item.filename) }}" type="{{ item.mime }}">
+      </audio>
+    {% elif "image" in item.mime %}
+      <img src="{{ storage.get_url(item.filename) }}" class="img-fluid rounded">
+    {% elif "pdf" in item.mime %}
+      <iframe src="{{ storage.get_url(item.filename) }}" width="100%" height="600"></iframe>
+    {% elif "word" in item.mime or "excel" in item.mime or "presentation" in item.mime or item.filename.lower().endswith(('.docx','.doc','.xls','.xlsx','.ppt','.pptx')) %}
+      {# Microsoft Office file viewer requires the URL to be publicly accessible and url-encoded #}
+      <iframe src="https://view.officeapps.live.com/op/embed.aspx?src={{ storage.get_url(item.filename) | urlencode }}"
+              width="100%" height="600" frameborder="0">
+      </iframe>
+    {% else %}
+      <div class="alert alert-info">
+        <p>No preview available for this file type.</p>
+        <a href="{{ storage.get_url(item.filename) }}" class="btn btn-primary" download>
+          Download {{ item.filename.split('/')[-1] }}
+        </a>
+      </div>
+    {% endif %}
+  {% else %}
+    <p class="text-muted">No primary file associated with this item.</p>
+  {% endif %}
+</div>
+
+{% if item.attachments %}
+  <h5 class="mt-4">Attachments</h5>
+  <div class="row">
+    {% for a in item.attachments %}
+    <div class="col-md-6 mb-3">
+      <div class="card h-100">
+        <div class="card-body">
+            <p class="fw-semibold">{{ a.filename.split('/')[-1] }}</p>
+            {% if "video" in a.mime %}
+              <video controls width="100%"><source src="{{ storage.get_url(a.filename) }}" type="{{ a.mime }}"></video>
+            {% elif "audio" in a.mime %}
+              <audio controls style="width:100%"><source src="{{ storage.get_url(a.filename) }}" type="{{ a.mime }}"></audio>
+            {% elif "image" in a.mime %}
+              <img src="{{ storage.get_url(a.filename) }}" class="img-fluid rounded">
+            {% elif "pdf" in a.mime %}
+                <p class="text-center"><a href="{{ storage.get_url(a.filename) }}" target="_blank" class="btn btn-outline-danger"><i class="bi bi-file-pdf"></i> View PDF</a></p>
+            {% else %}
+              <a href="{{ storage.get_url(a.filename) }}" class="btn btn-outline-secondary" download>{{ a.filename.split('/')[-1] }}</a>
+            {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+{% endif %}

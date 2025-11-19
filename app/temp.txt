@@ -1,0 +1,19 @@
+class ChatRoom(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120))
+    is_team = db.Column(db.Boolean, default=False)
+    is_channel = db.Column(db.Boolean, default=False)
+    created_by = db.Column(db.Integer, db.ForeignKey("user.id"))
+
+
+// --- navigation ---
+// document.getElementById("nextBtn").addEventListener("click",()=>{
+//   saveCurrentAnswer();
+// autoSave()
+  if(current < total){ current++; loadQuestion(); }
+});
+document.getElementById("prevBtn").addEventListener("click",()=>{
+  saveCurrentAnswer();
+autoSave()
+  if(current > 1){ current--; loadQuestion(); }
+});

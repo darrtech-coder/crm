@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <div class="row">
+    <!-- Sidebar -->
+    <div class="col-md-3">
+      <h5>Teammates</h5>
+      <ul class="list-group" id="teammates-list">
+  {% for mate in teammates if mate.id != current_user.id %}
+    <li class="list-group-item d-flex justify-content-between align-items-center" id="mate-{{mate.id}}">
+      <span>{{ mate.username }} <span class="badge bg-secondary status">…</span></span>
+      <a href="{{ url_for('messaging.create_direct', user_id=mate.id) }}" class="btn btn-sm btn-outline-primary">Message</a>
+    </li>
+  {% endfor %}
+</ul>
+
+    </div>
+
+    <!-- Main -->
+    <div class="col-md-9">
+      <h2>My Chat Rooms</h2>
+      <a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary mb-3">&larr; Back</a>
+
+<form method="POST" action="{{ url_for('messaging.add_friend') }}" class="mb-3">
+  <div class="input-group">
+    <input type="text" name="identifier" class="form-control" placeholder="Email or Username" required>
+    <button type="submit" class="btn btn-success">Add Friend</button>
+  </div>
+</form>
+      <ul class="list-group">
+        {% for room in rooms %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            {{ room.name }}
+            <a href="{{ url_for('messaging.room', room_id=room.id) }}" class="btn btn-sm btn-primary">Open</a>
+          </li>
+        {% else %}
+          <li class="list-group-item">No rooms found</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+function pollPresence(){
+  fetch("{{ url_for('messaging.presence') }}")
+    .then(r => r.json())
+    .then(data => {
+      data.forEach(u => {
+        let el = document.querySelector("#mate-"+u.id+" .status");
+        if(el){
+          el.className = "badge " + (u.status=="online" ? "bg-success" : "bg-secondary");
+          el.innerText = u.status;
+        }
+      });
+    });
+}
+setInterval(pollPresence, 5000); // every 5 sec
+pollPresence(); // initial call
+</script>
+{% endblock %}

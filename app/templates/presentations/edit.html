@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <a href="{{ url_for('presentations.index') }}" class="btn btn-secondary mb-3">&larr; Back</a>
+  <h2>Edit Presentation: {{ presentation.title }}</h2>
+
+  <form method="POST" enctype="multipart/form-data">
+    <div class="mb-3">
+      <label>Title</label>
+      <input class="form-control" name="title" value="{{ presentation.title }}">
+    </div>
+
+    <!-- Manager-only restriction -->
+    <div class="form-check mb-3">
+      <input type="checkbox" class="form-check-input" name="restricted_to_managers" {% if presentation.restricted_to_managers %}checked{% endif %}>
+      <label class="form-check-label">Manager-only Presentation</label>
+    </div>
+
+    <!-- Restrict Access -->
+    <div class="mb-3">
+      <label class="form-label">Restrict to Teams</label>
+      <select name="team_ids" class="form-select" multiple>
+        {% for t in teams %}
+          <option value="{{ t.id }}"
+            {% if t.id in presentation.access_rules|map(attribute='team_id')|list %}selected{% endif %}>
+            {{ t.name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <input type="text" class="form-control mb-3" name="user_ids"
+           value="{{ presentation.access_rules|selectattr('user_id')|map(attribute='user_id')|join(', ') }}"
+           placeholder="Comma-separated user IDs">
+
+    <h4>Replace Slides via PowerPoint Upload (optional)</h4>
+    <input type="file" name="pptx" accept=".pptx,.ppt,.pdf" class="form-control mb-3">
+
+    <h4>Edit Slides Manually</h4>
+    <div id="slides">
+      {% for s in presentation.slides %}
+      <div class="card p-3 mb-3">
+        <h5>Slide {{ loop.index }}</h5>
+        <label>Client View:</label>
+        <textarea class="tinymce" name="client_content">{{ s.client_content }}</textarea>
+        <label>Agent Notes:</label>
+        <textarea class="tinymce" name="agent_notes">{{ s.agent_notes }}</textarea>
+      </div>
+      {% endfor %}
+    </div>
+    <button type="button" class="btn btn-outline-secondary" onclick="addSlide()">+ Add Another Slide</button>
+    <button type="submit" class="btn btn-success mt-3">Save Changes</button>
+    <a href="{{ url_for('presentations.index') }}" class="btn btn-secondary mt-3">Cancel</a>
+
+    {% if current_user.role in ["MANAGER","ADMIN","SUPER_ADMIN"] %}
+    <!-- 💾 Export Backup -->
+    <a href="{{ url_for('presentations.export_zpb', pres_id=presentation.id) }}" 
+       class="btn btn-outline-dark mt-3">💾 Export Backup</a>
+    {% endif %}
+  </form>
+</div>
+
+<script>
+let slideCounter={{ presentation.slides|length + 1 }};
+function addSlide(){
+  let d=document.createElement("div");
+  d.className="card p-3 mb-3";
+  d.innerHTML=`<h5>Slide ${slideCounter}</h5>
+               <label>Client View:</label>
+               <textarea class="tinymce" name="client_content"></textarea>
+               <label>Agent Notes:</label>
+               <textarea class="tinymce" name="agent_notes"></textarea>`;
+  document.getElementById("slides").appendChild(d);
+  tinymce.init({  
+    selector: '.tinymce',
+    plugins: 'lists link media table image code',
+    toolbar: 'undo redo | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | code',
+    height: 300,
+    automatic_uploads: true,
+    images_upload_url: '/presentations/upload_media',
+    file_picker_types: 'image media',
+    file_picker_callback: function(callback, value, meta) {
+      let win = window.open('/presentations/media_manager', 'Media Manager', 'width=800,height=600');
+      window.addEventListener('message', function(event){
+        if(event.data.fileUrl){ callback(event.data.fileUrl); win.close(); }
+      });
+    },
+    license_key: 'gpl'
+  });
+  slideCounter++;
+}
+</script>
+{% endblock %}

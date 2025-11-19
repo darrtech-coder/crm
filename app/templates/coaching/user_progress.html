@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<a href="{{ url_for('coaching.plan_progress', plan_id=plan.id) }}" class="btn btn-secondary mb-3">&larr; Back to Plan Progress</a>
+<h2>Progress Details — {{ user.username }}</h2>
+<p class="text-muted">
+  Plan: <strong>{{ plan.title }}</strong> • Due {{ plan.due_date.strftime("%Y-%m-%d") if plan.due_date else "—" }}
+</p>
+
+<h4>📘 Courses (from Library)</h4>
+<table class="table table-sm table-bordered">
+  <thead><tr><th>Course</th><th>Status</th></tr></thead>
+  <tbody>
+    {% for c in courses %}
+      <tr>
+        <td>{{ c.title }}</td>
+        <td>{% if c.viewed %}✅ Viewed{% else %}❌ Not Viewed{% endif %}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="2" class="text-muted">No courses assigned to this plan.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h4 class="mt-4">🧠 Tests</h4>
+<table class="table table-sm table-bordered">
+  <thead><tr><th>Test</th><th>Score (%)</th><th>Last Submission</th></tr></thead>
+  <tbody>
+    {% for t in tests %}
+      <tr>
+        <td>{{ t.title }}</td>
+        <td>{{ t.score }}</td>
+        <td>{{ t.submitted_at | tz("%Y-%m-%d %H:%M") }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="3" class="text-muted">No tests assigned to this plan.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

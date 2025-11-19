@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<a href="{{ url_for('coaching.list_plans') }}" class="btn btn-secondary">← Back</a>
+<h2>Progress for {{ plan.title }}</h2>
+<table class="table table-striped">
+  <thead><tr><th>User</th><th>Courses</th><th>Tests</th><th>Acknowledged</th></tr></thead>
+  <tbody>
+  {% for r in report %}
+    <tr>
+<td>
+  <a href="{{ url_for('coaching.user_progress', plan_id=plan.id, user_id=r.user_id) }}">
+    {{ r.username }}
+  </a>
+</td>
+      <td>{{ r.courses }}</td>
+      <td>{{ r.tests }}</td>
+      <td>
+        {% if r.ack %}
+          <div class="d-flex align-items-center gap-2">
+            <span class="text-success">✅ Yes</span>
+            {# --- [NEW] Add Re-open button --- #}
+            <form method="POST" 
+                  action="{{ url_for('coaching.unacknowledge', plan_id=plan.id, user_id=r.user_id) }}" 
+                  onsubmit="return confirm('Re-open this plan for {{ r.username }}? They will be notified.');">
+              <button class="btn btn-sm btn-outline-warning">Re-open</button>
+            </form>
+          </div>
+        {% else %}
+          ❌ No
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

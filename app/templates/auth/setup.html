@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card shadow-lg border-0 rounded-lg mt-5">
+      <div class="card-body p-4">
+        
+        <!-- STEP 1: DATABASE -->
+        <div id="step1">
+          <h3 class="text-center mb-1">First-Time Setup</h3>
+          <h5 class="text-muted text-center mb-4">Step 1 of 3: Configure Database</h5>
+          <form id="dbForm">
+            <div class="mb-3"><label for="db_type" class="form-label">Database Type</label><select id="db_type" class="form-select"><option value="sqlite" selected>SQLite (simple)</option><option value="postgresql">PostgreSQL</option><option value="mysql">MySQL</option></select></div>
+            <div id="sqlite_options" class="db-options"><p class="text-muted">SQLite is a simple file-based database. No other configuration is needed.</p></div>
+            <div id="remote_db_options" class="db-options" style="display:none;"><div class="row g-3"><div class="col-md-6"><input id="db_user" class="form-control" placeholder="User"></div><div class="col-md-6"><div class="input-group"><input id="db_pass" class="form-control" type="password" placeholder="Password"><button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('db_pass')">👁️</button></div></div><div class="col-md-6"><input id="db_host" class="form-control" placeholder="Host"></div><div class="col-md-6"><input id="db_port" class="form-control" type="number" placeholder="Port"></div><div class="col-12"><input id="db_name" class="form-control" placeholder="Database Name"></div></div><button id="test_conn_btn" type="button" class="btn btn-outline-secondary mt-3">Test Connection</button><div id="conn_status" class="mt-2"></div></div>
+            <hr><button type="button" id="next_to_step2" class="btn btn-primary float-end">Next &rarr;</button>
+          </form>
+        </div>
+
+        <!-- STEP 2: STORAGE -->
+        <div id="step2" style="display:none;">
+            <h3 class="text-center mb-1">First-Time Setup</h3>
+            <h5 class="text-muted text-center mb-4">Step 2 of 3: Configure File Storage</h5>
+            <form id="storageForm">
+                <div class="mb-3"><label for="fs_backend" class="form-label fw-bold">Storage Backend</label><select name="fs_backend" id="fs_backend" class="form-select"><option value="local" selected>Local Server Storage</option><option value="s3">S3-Compatible</option><option value="gcs">Google Cloud Storage</option></select></div>
+                <div class="mb-3"><label class="form-label">Storage Path Prefix <span class="text-muted">(Optional)</span></label><input type="text" class="form-control" id="storage_prefix" placeholder="e.g., crm/uploads"></div>
+                <div id="storage-local" class="storage-options card card-body bg-light"><p class="text-muted mb-0">Files will be stored locally. Recommended to switch to remote storage for production.</p></div>
+                <div id="storage-s3" class="storage-options card card-body" style="display: none;"><h5>S3-Compatible Config</h5><p class="small text-muted">For AWS S3, R2, B2, etc.</p><div class="row g-3"><div class="col-md-6"><label>Access Key ID</label><input type="text" class="form-control" id="s3_key"></div><div class="col-md-6"><label>Secret Access Key</label><input type="password" class="form-control" id="s3_secret"></div><div class="col-md-6"><label>Bucket Name</label><input type="text" class="form-control" id="s3_bucket"></div><div class="col-md-6"><label>Region</label><input type="text" class="form-control" id="s3_region" placeholder="e.g., us-east-1"></div></div><hr><div class="mb-3"><label>Endpoint URL <span class="text-muted">(for non-AWS)</span></label><input type="text" class="form-control" id="s3_endpoint_url" placeholder="e.g., https://<id>.r2.cloudflarestorage.com"></div><div class="mb-3"><label>CDN URL <span class="text-muted">(Optional)</span></label><input type="text" class="form-control" id="s3_cdn_url" placeholder="e.g., https://pub-....r2.dev"></div></div>
+                <div id="storage-gcs" class="storage-options card card-body" style="display: none;"><h5>GCS Config</h5><div class="mb-3"><label>GCS Bucket</label><input type="text" class="form-control" id="gcs_bucket"></div><div class="mb-3"><label>GCS Service Account JSON Keyfile</label><input type="file" class="form-control" id="gcs_keyfile_upload" accept=".json"></div><div class="mb-3"><label>CDN URL <span class="text-muted">(Optional)</span></label><input type="text" class="form-control" id="gcs_cdn_url" placeholder="e.g., https://storage.googleapis.com/bucket"></div></div>
+            </form>
+            <hr>
+            <div class="d-flex justify-content-between">
+                <button type="button" id="back_to_step1" class="btn btn-secondary">&larr; Back</button>
+                <button type="button" id="next_to_step3" class="btn btn-primary">Next &rarr;</button>
+            </div>
+        </div>
+
+        <!-- STEP 3: ADMIN USER -->
+        <div id="step3" style="display:none;">
+          <h3 class="text-center mb-1">First-Time Setup</h3>
+          <h5 class="text-muted text-center mb-4">Step 3 of 3: Create Super Admin</h5>
+          <form id="setupForm" method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="final_setup" value="1">
+            <input type="hidden" name="db_uri" id="db_uri_hidden">
+            <input type="hidden" name="fs_backend" id="fs_backend_hidden">
+            <input type="hidden" name="storage_prefix" id="storage_prefix_hidden">
+            <input type="hidden" name="s3_key" id="s3_key_hidden">
+            <input type="hidden" name="s3_secret" id="s3_secret_hidden">
+            <input type="hidden" name="s3_bucket" id="s3_bucket_hidden">
+            <input type="hidden" name="s3_region" id="s3_region_hidden">
+            <input type="hidden" name="s3_endpoint_url" id="s3_endpoint_url_hidden">
+            <input type="hidden" name="s3_cdn_url" id="s3_cdn_url_hidden">
+            <input type="hidden" name="gcs_bucket" id="gcs_bucket_hidden">
+            <input type="hidden" name="gcs_cdn_url" id="gcs_cdn_url_hidden">
+            
+            <div class="mb-3"><label class="form-label">Email</label><input class="form-control" type="email" name="email" required></div>
+            <div class="mb-3"><label class="form-label">Username</label><input class="form-control" type="text" name="username" required></div>
+            <div class="mb-3"><label class="form-label">Password</label><div class="input-group"><input class="form-control" type="password" id="password" name="password" required><button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('password')">👁️</button></div></div>
+            <div class="mb-3"><label class="form-label">Verify Password</label><input class="form-control" type="password" id="verify_password" required><div id="password_error" class="text-danger small mt-1" style="display: none;">Passwords do not match.</div></div>
+            <div class="d-flex justify-content-between">
+              <button type="button" id="back_to_step2" class="btn btn-secondary">&larr; Back</button>
+              <button type="submit" id="finishBtn" class="btn btn-success">Create Super Admin & Finish</button>
+            </div>
+          </form>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+    function togglePasswordVisibility(fieldId) {
+        const field = document.getElementById(fieldId);
+        const button = field.closest('.input-group').querySelector('button');
+        if (field.type === "password") {
+            field.type = "text";
+            button.textContent = '🙈';
+        } else {
+            field.type = "password";
+            button.textContent = '👁️';
+        }
+    }
+
+document.addEventListener("DOMContentLoaded", function() {
+    const steps = [document.getElementById("step1"), document.getElementById("step2"), document.getElementById("step3")];
+    const showStep = (index) => steps.forEach((s, i) => s.style.display = (i === index) ? 'block' : 'none');
+
+    // --- DB Logic ---
+    const dbTypeSelect = document.getElementById("db_type");
+    const testConnBtn = document.getElementById("test_conn_btn");
+    dbTypeSelect.addEventListener("change", toggleDbOptions);
+    testConnBtn.addEventListener('click', testDbConnection);
+    function toggleDbOptions() {
+        document.getElementById("sqlite_options").style.display = (dbTypeSelect.value === 'sqlite') ? 'block' : 'none';
+        document.getElementById("remote_db_options").style.display = (dbTypeSelect.value === 'sqlite') ? 'none' : 'block';
+    }
+    function buildDbUri() {
+        const type = dbTypeSelect.value;
+        if (type === 'sqlite') return 'sqlite:///app.db';
+        const user = document.getElementById('db_user').value.trim();
+        const pass = encodeURIComponent(document.getElementById('db_pass').value);
+        const host = document.getElementById('db_host').value.trim();
+        const port = document.getElementById('db_port').value.trim();
+        const name = document.getElementById('db_name').value.trim();
+        if (!user || !host || !port || !name) { alert('Please fill in all database fields.'); return null; }
+        const dialect = (type === 'mysql') ? 'mysql+pymysql' : 'postgresql';
+        return `${dialect}://${user}:${pass}@${host}:${port}/${name}`;
+    }
+    function testDbConnection() {
+        const uri = buildDbUri();
+        if (!uri) return;
+        const connStatus = document.getElementById("conn_status");
+        connStatus.innerHTML = '<span class="text-muted">Testing...</span>';
+        fetch("{{ url_for('auth.test_db_connection') }}", {
+            method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ db_uri: uri })
+        }).then(res => res.json()).then(data => {
+            if (data.ok) { connStatus.innerHTML = '<span class="text-success">✅ Connection successful!</span>'; }
+            else { connStatus.innerHTML = `<span class="text-danger">❌ Connection failed: ${data.error}</span>`; }
+        }).catch(err => { connStatus.innerHTML = `<span class="text-danger">❌ Network error.</span>`; });
+    }
+
+    // --- Storage Logic ---
+    const fsBackendSelect = document.getElementById("fs_backend");
+    fsBackendSelect.addEventListener('change', () => {
+        document.querySelectorAll('.storage-options').forEach(el => el.style.display = 'none');
+        document.getElementById(`storage-${fsBackendSelect.value}`).style.display = 'block';
+    });
+
+    // --- Password Validation Logic ---
+    const passwordInput = document.getElementById('password');
+    const verifyInput = document.getElementById('verify_password');
+    const passwordError = document.getElementById('password_error');
+    const finishBtn = document.getElementById('finishBtn');
+    function validatePasswords() {
+        if (passwordInput.value && passwordInput.value === verifyInput.value) {
+            passwordError.style.display = 'none'; finishBtn.disabled = false;
+        } else {
+            if (verifyInput.value) { passwordError.style.display = 'block'; }
+            finishBtn.disabled = true;
+        }
+    }
+    passwordInput.addEventListener('input', validatePasswords);
+    verifyInput.addEventListener('input', validatePasswords);
+
+    // --- Navigation Logic ---
+    document.getElementById("next_to_step2").addEventListener("click", () => {
+        if (buildDbUri()) { showStep(1); }
+    });
+    document.getElementById("back_to_step1").addEventListener("click", () => showStep(0));
+    document.getElementById("next_to_step3").addEventListener("click", () => {
+        document.getElementById('db_uri_hidden').value = buildDbUri();
+        document.getElementById('fs_backend_hidden').value = document.getElementById('fs_backend').value;
+        document.getElementById('storage_prefix_hidden').value = document.getElementById('storage_prefix').value;
+        document.getElementById('s3_key_hidden').value = document.getElementById('s3_key').value;
+        document.getElementById('s3_secret_hidden').value = document.getElementById('s3_secret').value;
+        document.getElementById('s3_bucket_hidden').value = document.getElementById('s3_bucket').value;
+        document.getElementById('s3_region_hidden').value = document.getElementById('s3_region').value;
+        document.getElementById('s3_endpoint_url_hidden').value = document.getElementById('s3_endpoint_url').value;
+        document.getElementById('s3_cdn_url_hidden').value = document.getElementById('s3_cdn_url').value;
+        document.getElementById('gcs_bucket_hidden').value = document.getElementById('gcs_bucket').value;
+        document.getElementById('gcs_cdn_url_hidden').value = document.getElementById('gcs_cdn_url').value;
+        showStep(2);
+    });
+    document.getElementById("back_to_step2").addEventListener("click", () => showStep(1));
+    
+    document.getElementById('setupForm').addEventListener('submit', function(e) {
+        const gcsFile = document.getElementById('gcs_keyfile_upload').files[0];
+        if (gcsFile) {
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(gcsFile);
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.name = 'gcs_keyfile_upload';
+            fileInput.files = dataTransfer.files;
+            fileInput.style.display = 'none';
+            this.appendChild(fileInput);
+        }
+    });
+
+    // --- Initial State ---
+    showStep(0);
+    toggleDbOptions();
+    fsBackendSelect.dispatchEvent(new Event('change'));
+    validatePasswords();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <a href="{{ url_for('coaching.list_plans') }}" class="btn btn-secondary mb-3">&larr; Back to Plans</a>
+
+  <div class="card shadow-sm">
+    <div class="card-header">
+      <h3>{{ plan.title }}</h3>
+      <p class="text-muted mb-0">{{ plan.description }}</p>
+    </div>
+    <div class="card-body">
+      
+      {% if acknowledged %}
+        <div class="alert alert-success">
+          <strong>✓ Completed!</strong> You acknowledged this plan on {{ acknowledged.acknowledged_at | tz('%Y-%m-%d') }}.
+        </div>
+      {% endif %}
+
+      <h5 class="mt-3">📘 Library Items to Review</h5>
+      <ul class="list-group mb-4">
+        {% for item_data in plan_items %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <a href="{{ url_for('library.view_item', item_id=item_data.item.id) }}" target="_blank">
+              {{ item_data.item.title }}
+            </a>
+            {% if item_data.viewed %}
+              <span class="badge bg-success">✓ Viewed</span>
+            {% else %}
+              <span class="badge bg-secondary">Pending</span>
+            {% endif %}
+          </li>
+        {% else %}
+          <li class="list-group-item text-muted">No library items are required for this plan.</li>
+        {% endfor %}
+      </ul>
+
+      <h5 class="mt-4">🧪 Tests to Complete</h5>
+      <p class="text-muted small">You must achieve a score of {{ plan.pass_percent }}% or higher on each test.</p>
+      <ul class="list-group">
+        {% for test_data in plan_tests %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              <a href="{{ url_for('tests.ready', test_id=test_data.test.id) }}" target="_blank">
+                {{ test_data.test.title }}
+              </a>
+              {% if test_data.submission %}
+                <small class="d-block text-muted">Last submitted: {{ test_data.submission.submitted_at | tz('%Y-%m-%d %H:%M') }}</small>
+              {% endif %}
+            </div>
+            {% if test_data.passed %}
+              <span class="badge bg-success">✓ Passed</span>
+            {% else %}
+              <span class="badge bg-danger">Not Passed</span>
+            {% endif %}
+          </li>
+        {% else %}
+          <li class="list-group-item text-muted">No tests are required for this plan.</li>
+        {% endfor %}
+      </ul>
+
+      {% if not acknowledged %}
+        <hr class="my-4">
+        <form method="POST" action="{{ url_for('coaching.acknowledge', plan_id=plan.id) }}">
+          <div class="d-grid">
+            <button class="btn btn-primary btn-lg">Acknowledge Completion</button>
+          </div>
+        </form>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ presentation.title }} (Agent)</h2>
+<div id="agent-slide" class="slide light"></div>
+<div id="agent-notes" class="slide agent-notes"></div>
+<div>
+<div id="agent-nav" class="agent-nav">
+  {% for s in presentation.slides %}
+    <button onclick="goSlide({{s.id}})" id="slide-btn-{{s.id}}">
+      Slide {{ loop.index }}
+    </button>
+  {% endfor %}
+</div>
+</div>
+<script>
+function goSlide(id){
+  fetch("{{ url_for('presentations.goto_slide', pres_id=presentation.id, slide_id=0) }}".replace("0",id),{method:"POST"}).then(r=>r.json()).then(d=>updateAgent());
+}
+function updateAgent(){
+ fetch("{{ url_for('presentations.current', pres_id=presentation.id) }}")
+ .then(r=>r.json()).then(d=>{
+   if(d.id){
+     document.getElementById("agent-slide").innerHTML = d.client_content;
+     document.getElementById("agent-notes").innerHTML = "<h4>Notes</h4>"+d.agent_notes;
+   }
+ })
+}
+setInterval(updateAgent, 1500);
+setInterval(updateAgent,2000);
+
+function goSlide(id){
+  fetch("{{ url_for('presentations.goto_slide', pres_id=presentation.id, slide_id=0) }}".replace("0",id), {method:"POST"})
+    .then(()=>updateAgent());
+  highlightSlide(id);
+}
+
+function highlightSlide(id){
+  document.querySelectorAll("#agent-nav button").forEach(b=>b.classList.remove("active"));
+  let activeBtn = document.getElementById("slide-btn-"+id);
+  if(activeBtn) activeBtn.classList.add("active");
+}
+
+function updateAgent(){
+  fetch("{{ url_for('presentations.current', pres_id=presentation.id) }}")
+  .then(r=>r.json())
+  .then(d=>{
+    if(d.id){
+      document.getElementById("agent-slide").innerHTML = d.client_content;
+      document.getElementById("agent-notes").innerHTML = "<h4>Notes</h4>"+d.agent_notes;
+      highlightSlide(d.id);
+    }
+  });
+}
+</script>
+{% endblock %}

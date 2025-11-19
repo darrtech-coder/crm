@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block content %}
+<a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary mb-3">&larr; Back</a>
+<div class="container mt-4">
+    <h2>System Settings</h2>
+    <form method="POST" enctype="multipart/form-data">
+        <!-- Security & User Settings -->
+        <h4>Security & Users</h4>
+        <div class="form-check mb-3">
+            <input type="checkbox" class="form-check-input" id="log_unauth" name="log_unauth" {% if settings.log_unauth=="True" or settings.log_unauth==True %}checked{% endif %}>
+            <label for="log_unauth" class="form-check-label">Log unauthorized access attempts</label>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-4"><label class="form-label">Max Failed Logins</label><input type="number" class="form-control" name="max_failed" value="{{ settings.max_failed }}"></div>
+            <div class="col-md-4"><label class="form-label">Lockout (minutes)</label><input type="number" class="form-control" name="lockout" value="{{ settings.lockout }}"></div>
+        </div>
+        <div class="form-check mb-3">
+            <input type="checkbox" class="form-check-input" id="allow_reg" name="allow_reg" {% if settings.allow_reg=="True" or settings.allow_reg==True %}checked{% endif %}>
+            <label for="allow_reg" class="form-check-label">Allow self‑registration</label>
+        </div>
+
+        <!-- Password Complexity -->
+        <h4>Password Complexity</h4>
+        <div class="row mb-3">
+            <div class="col-md-3"><label class="form-label">Minimum Length</label><input type="number" class="form-control" name="pw_length" value="{{ settings.pw_length }}"></div>
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="pw_upper" id="pw_upper" {% if settings.pw_upper %}checked{% endif %}>
+            <label class="form-check-label" for="pw_upper">Require Uppercase Letter</label>
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="pw_number" id="pw_number" {% if settings.pw_number %}checked{% endif %}>
+            <label class="form-check-label" for="pw_number">Require Number</label>
+        </div>
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="pw_symbol" id="pw_symbol" {% if settings.pw_symbol %}checked{% endif %}>
+            <label class="form-check-label" for="pw_symbol">Require Symbol</label>
+        </div>
+
+        <hr>
+        <!-- Infrastructure -->
+        <h4>Infrastructure</h4>
+        <div class="row mb-3">
+            <div class="col-md-4">{% include "dashboard/timezones.html" %}</div>
+            <div class="col-md-4">
+                <label class="form-label">Redis Mode</label>
+                <select name="redis_mode" id="redis_mode" class="form-select">
+                    <option value="local" {{ 'selected' if settings.redis_mode=='local' }}>Local (default)</option>
+                    <option value="remote" {{ 'selected' if settings.redis_mode=='remote' }}>Remote</option>
+                    <option value="none" {{ 'selected' if settings.redis_mode=='none' }}>None (disable)</option>
+                </select>
+            </div>
+            <div class="col-md-4" id="redis_url_wrap" style="display: none;">
+                <label class="form-label">Redis URL</label>
+                <input class="form-control" name="redis_url" id="redis_url" placeholder="redis://:password@host:6379/0" value="{{ settings.redis_url or '' }}">
+                <small class="text-muted">Required if mode is Remote.</small>
+            </div>
+        </div>
+
+        <!-- Storage Settings -->
+        <hr>
+        <h4>File Storage</h4>
+        <div class="mb-3">
+            <label for="fs_backend" class="form-label fw-bold">Storage Backend</label>
+            <select name="fs_backend" id="fs_backend" class="form-select">
+                <option value="local" {% if settings.fs_backend == 'local' %}selected{% endif %}>Local Server Storage (Default)</option>
+                <option value="s3" {% if settings.fs_backend == 's3' %}selected{% endif %}>S3-Compatible Object Storage</option>
+                <option value="gcs" {% if settings.fs_backend == 'gcs' %}selected{% endif %}>Google Cloud Storage</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Storage Path Prefix <span class="text-muted">(Optional)</span></label>
+            <input type="text" class="form-control" name="storage_prefix" value="{{ settings.storage_prefix or '' }}" placeholder="e.g., crm/uploads">
+            <small class="text-muted">A root folder inside your bucket to store all files. Helps organize your bucket.</small>
+        </div>
+
+        <!-- Local Options -->
+        <div id="storage-local" class="storage-options card card-body bg-light" style="display: none;">
+            <p class="text-muted mb-0">Files will be stored on the local server. No further configuration is needed.</p>
+        </div>
+
+        <!-- S3-Compatible Options -->
+        <div id="storage-s3" class="storage-options card card-body" style="display: none;">
+            <h5>S3-Compatible Configuration</h5>
+            <p class="small text-muted">Use this for AWS S3, Cloudflare R2, Backblaze B2, DigitalOcean Spaces, MinIO, etc.</p>
+            <div class="row g-3">
+                <div class="col-md-6"><label>Access Key ID</label><input type="text" class="form-control" name="s3_key" value="{{ settings.s3_key or '' }}"></div>
+                <div class="col-md-6"><label>Secret Access Key</label><input type="password" class="form-control" name="s3_secret" value="{{ settings.s3_secret or '' }}"></div>
+                <div class="col-md-6"><label>Bucket Name</label><input type="text" class="form-control" name="s3_bucket" value="{{ settings.s3_bucket or '' }}"></div>
+                <div class="col-md-6"><label>Region</label><input type="text" class="form-control" name="s3_region" value="{{ settings.s3_region or '' }}" placeholder="e.g., auto or us-east-1"></div>
+            </div>
+            <hr>
+            <div class="mb-3"><label>Endpoint URL <span class="text-muted">(for non-AWS services)</span></label><input type="text" class="form-control" name="s3_endpoint_url" value="{{ settings.s3_endpoint_url or '' }}" placeholder="e.g., https://<accountid>.r2.cloudflarestorage.com"></div>
+            <div class="mb-3"><label>CDN / Public URL Prefix <span class="text-muted">(Optional)</span></label><input type="text" class="form-control" name="s3_cdn_url" value="{{ settings.s3_cdn_url or '' }}" placeholder="e.g., https://pub-....r2.dev"></div>
+            <button type="button" class="btn btn-secondary mt-2" onclick="testStorage('s3')">Test S3 Connection</button>
+            <div id="s3-status" class="mt-2"></div>
+        </div>
+
+        <!-- GCS Options -->
+        <div id="storage-gcs" class="storage-options card card-body" style="display: none;">
+            <h5>Google Cloud Storage Configuration</h5>
+            <div class="mb-3"><label>GCS Bucket Name</label><input type="text" class="form-control" name="gcs_bucket" value="{{ settings.gcs_bucket or '' }}"></div>
+            <div class="mb-3">
+                <label>GCS Service Account JSON Keyfile</label>
+                <input type="file" class="form-control" name="gcs_keyfile_upload" accept=".json">
+                <small class="text-muted">Upload a new keyfile to replace the existing one. Current file: {{ 'Set' if settings.gcs_keyfile_path else 'Not set' }}</small>
+            </div>
+            <div class="mb-3"><label>CDN / Public URL Prefix <span class="text-muted">(Optional)</span></label><input type="text" class="form-control" name="gcs_cdn_url" value="{{ settings.gcs_cdn_url or '' }}" placeholder="e.g., https://storage.googleapis.com/your-bucket"></div>
+            <button type="button" class="btn btn-secondary mt-2" onclick="testStorage('gcs')">Test GCS Connection</button>
+            <div id="gcs-status" class="mt-2"></div>
+        </div>
+
+        <hr>
+        <div class="d-flex justify-content-between align-items-center">
+            <button type="submit" class="btn btn-primary">💾 Save Settings</button>
+            <button type="button" id="migrateBtn" class="btn btn-warning">🚚 Migrate Files to These Settings</button>
+        </div>
+        <div id="migrationStatus" class="mt-3"></div>
+    </form>
+</div>
+
+<script>
+  function toggleRedisUrl(){
+    const mode = document.getElementById('redis_mode').value;
+    document.getElementById('redis_url_wrap').style.display = (mode === 'remote') ? 'block' : 'none';
+  }
+
+  function toggleStorageOptions() {
+      const backend = document.getElementById('fs_backend').value;
+      document.querySelectorAll('.storage-options').forEach(el => {
+          el.style.display = 'none';
+      });
+      const selectedOptionDiv = document.getElementById(`storage-${backend}`);
+      if (selectedOptionDiv) {
+          selectedOptionDiv.style.display = 'block';
+      }
+  }
+
+  function testStorage(type) {
+    let config = { fs_backend: type, storage_prefix: document.querySelector('[name=storage_prefix]').value };
+    let statusDiv;
+
+    if (type === 's3') {
+        config.s3_key = document.querySelector('[name=s3_key]').value;
+        config.s3_secret = document.querySelector('[name=s3_secret]').value;
+        config.s3_bucket = document.querySelector('[name=s3_bucket]').value;
+        config.s3_region = document.querySelector('[name=s3_region]').value;
+        config.s3_endpoint_url = document.querySelector('[name=s3_endpoint_url]').value;
+        statusDiv = document.getElementById('s3-status');
+    } else if (type === 'gcs') {
+        config.gcs_bucket = document.querySelector('[name=gcs_bucket]').value;
+        config.gcs_keyfile_path = "{{ settings.gcs_keyfile_path or '' }}";
+        statusDiv = document.getElementById('gcs-status');
+        if (!config.gcs_keyfile_path && !document.querySelector('[name=gcs_keyfile_upload]').files.length) {
+            alert('To test GCS, you must first save a keyfile via this form.'); return;
+        }
+        if (document.querySelector('[name=gcs_keyfile_upload]').files.length > 0) {
+            alert('Please save settings to upload the new GCS keyfile before testing.'); return;
+        }
+    } else { return; }
+    
+    statusDiv.innerHTML = '<span class="text-muted">Testing...</span>';
+    fetch("{{ url_for('dashboard.test_storage_connection') }}", {
+        method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(config)
+    }).then(res => res.json()).then(data => {
+        if (data.ok) { statusDiv.innerHTML = `<div class="alert alert-success p-2">${data.message}</div>`; }
+        else { statusDiv.innerHTML = `<div class="alert alert-danger p-2">Failed: ${data.error}</div>`; }
+    }).catch(err => { statusDiv.innerHTML = `<div class="alert alert-danger p-2">A network or server error occurred.</div>`; });
+  }
+
+  document.getElementById('migrateBtn').addEventListener('click', function() {
+    const btn = this;
+    const statusDiv = document.getElementById('migrationStatus');
+    if (!confirm('This will copy files from the CURRENT active storage to the NEW settings entered on this page. This can take a long time. Are you sure?')) { return; }
+    const newConfig = {
+        fs_backend: document.getElementById('fs_backend').value,
+        storage_prefix: document.querySelector('[name=storage_prefix]').value,
+        s3_key: document.querySelector('[name=s3_key]').value, s3_secret: document.querySelector('[name=s3_secret]').value,
+        s3_bucket: document.querySelector('[name=s3_bucket]').value, s3_region: document.querySelector('[name=s3_region]').value,
+        s3_endpoint_url: document.querySelector('[name=s3_endpoint_url]').value,
+        gcs_bucket: document.querySelector('[name=gcs_bucket]').value, gcs_keyfile_path: "{{ settings.gcs_keyfile_path or '' }}"
+    };
+    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Migrating...';
+    statusDiv.innerHTML = '<div class="alert alert-info">Migration in progress...</div>';
+    fetch("{{ url_for('dashboard.storage_migration') }}", {
+        method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(newConfig)
+    }).then(res => res.json()).then(data => {
+        if (data.ok) { statusDiv.innerHTML = `<div class="alert alert-success"><strong>Success!</strong> ${data.message}</div>`; }
+        else { statusDiv.innerHTML = `<div class="alert alert-danger"><strong>Error!</strong> ${data.error}</div>`; }
+    }).catch(err => { statusDiv.innerHTML = `<div class="alert alert-danger"><strong>Network Error!</strong> Could not complete migration.</div>`;
+    }).finally(() => { btn.disabled = false; btn.innerHTML = '🚚 Migrate Files to These Settings'; });
+  });
+
+  document.getElementById('redis_mode').addEventListener('change', toggleRedisUrl);
+  document.getElementById('fs_backend').addEventListener('change', toggleStorageOptions);
+  document.addEventListener('DOMContentLoaded', () => { toggleRedisUrl(); toggleStorageOptions(); });
+</script>
+{% endblock %}

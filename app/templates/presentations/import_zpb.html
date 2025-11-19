@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <a href="{{ url_for('presentations.index') }}" class="btn btn-secondary mb-3">&larr; Back</a>
+  <h2 class="mb-4">📥 Import Presentation Backup (.zpb)</h2>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <p class="text-muted">
+        Upload a <code>.zpb</code> (Zip Presentation Backup) previously exported from this system.<br>
+        Backups include presentation slides, agent notes, and any referenced media files.
+      </p>
+
+      <form method="POST" enctype="multipart/form-data">
+        <div class="mb-3">
+          <label for="file" class="form-label">Select ZPB File</label>
+          <input type="file" class="form-control" id="file" name="file" accept=".zpb,.zip" required>
+        </div>
+
+        <button type="submit" class="btn btn-success">Import Backup</button>
+        <a href="{{ url_for('presentations.index') }}" class="btn btn-secondary">Cancel</a>
+      </form>
+    </div>
+  </div>
+
+  <div class="alert alert-info mt-4">
+    <h6>📦 ZPB File Structure</h6>
+    <ul>
+      <li><code>details.json</code> → metadata (title, restrictions, type, etc.)</li>
+      <li><code>client/</code> → slide fragments for client view</li>
+      <li><code>agent/</code> → notes for each slide</li>
+      <li><code>media/</code> → supporting image/video/audio files</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

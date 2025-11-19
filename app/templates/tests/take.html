@@ -1,0 +1,484 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>{{ test.title }}</h2>
+
+  <!-- Progress bar -->
+  <div class="progress mb-2">
+    <div class="progress-bar" id="progressBar" style="width:0%"></div>
+  </div>
+
+  <p class="text-muted mb-2" id="progressText">Question 1 of {{ test.questions|length }}</p>
+
+  <form id="testForm" method="POST" enctype="multipart/form-data">
+    <div id="questionContainer" class="card shadow-sm p-4 mb-3">Loading question …</div>
+
+    <div class="d-flex justify-content-between">
+      <button type="button" class="btn btn-secondary" id="prevBtn" disabled>⬅ Back</button>
+      <button type="button" class="btn btn-primary" id="nextBtn">Next ➡</button>
+      <button type="submit" class="btn btn-success d-none" id="submitBtn">Finish Test</button>
+    </div>
+  </form>
+</div>
+
+<script>
+const autosaved = {{ autosaved|tojson }};
+const testId = {{ test.id }};
+let current = {{ start_question or 1 }};
+let total = {{ test.questions|length }};
+let answers = autosaved || {};
+
+// This object will temporarily hold recorder instances
+let recorders = {};
+
+
+
+let audioAnswers = {}; // qid -> filename (in audio_temp), persisted via hidden inputs
+
+function setAudioFilename(qid, filename) {
+  // Persist in memory
+  audioAnswers[qid] = filename;
+
+  // Ensure a persistent hidden input at the FORM level
+  const form = document.getElementById("testForm");
+  const hidId = "audio_q_" + qid;
+  let hidden = document.getElementById(hidId);
+  if (!hidden) {
+    hidden = document.createElement("input");
+    hidden.type = "hidden";
+    hidden.name = "recorded_audio_" + qid; // backend expects this
+    hidden.id = hidId;
+    form.appendChild(hidden);
+  }
+  hidden.value = filename;
+}
+
+// For file uploads (when user selects audio file instead of recording)
+// We upload immediately to the same endpoint as the recorder
+function bindAudioUpload(qid) {
+  const input = document.querySelector(`input[name="q${qid}"][type="file"]`);
+  if (!input) return;
+
+  input.addEventListener("change", async function () {
+    if (!this.files || !this.files[0]) return;
+    const fd = new FormData();
+    fd.append("audio_blob", this.files[0], this.files[0].name);
+    try {
+      const res = await fetch("{{ url_for('tests.upload_audio_chunk') }}", {
+        method: "POST",
+        body: fd
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setAudioFilename(qid, data.filename);
+        // Optional: show a quick toast/alert
+        console.log(`Audio uploaded for Q${qid}: ${data.filename}`);
+      } else {
+        alert("Audio upload failed: " + (data.error || "unknown error"));
+      }
+    } catch (e) {
+      alert("Network error while uploading audio.");
+    }
+  });
+}
+
+
+
+
+
+function loadQuestion(){
+  fetch(`/tests/${testId}/question/${current}`)
+    .then(r => r.json())
+    .then(data => { 
+        if (!data || data.error){ 
+            document.getElementById("questionContainer").innerText = "Question unavailable."; 
+            return; 
+        }
+        renderQuestion(data);
+    })
+    .catch(err => {
+        console.error("Fetch error:", err);
+        document.getElementById("questionContainer").innerText = "Error loading question.";
+    });
+}
+
+function renderQuestion(q){
+  document.getElementById("progressText").innerText = `Question ${q.index} of ${q.total}`;
+  document.getElementById("progressBar").style.width = `${(q.index/q.total)*100}%`;
+  updateClock();
+  let html = `<h5>${q.question}</h5>`;
+
+  if(q.media){
+    const m = q.media.toLowerCase();
+    const path = `/tests/media/${encodeURIComponent(q.media)}`;
+    if(m.match(/\.(mp4|mov|webm|avi|mkv)$/)){
+      html += `<video controls width="100%" class="rounded my-2"><source src="${path}" type="video/mp4"></video>`;
+    } else if(m.match(/\.(mp3|wav|ogg)$/)){
+      html += `<audio controls class="w-100 mb-2"><source src="${path}"></audio>`;
+    } else if(m.match(/\.(jpg|jpeg|png|gif|webp)$/)){
+      html += `<img src="${path}" class="img-fluid rounded my-2">`;
+    } else {
+      html += `<a href="${path}" target="_blank" class="btn btn-outline-secondary btn-sm mb-2">📎 Open Media File</a>`;
+    }
+  }
+
+  if (q.type === "mcq") {
+    html += '<div class="mt-3">';
+    q.options.forEach(opt => {
+      const checked = (answers[q.id] == opt.id) ? "checked" : "";
+      html += `<div class="form-check">
+                 <input class="form-check-input" type="radio" name="q${q.id}" value="${opt.id}" ${checked} id="opt${opt.id}">
+                 <label class="form-check-label" for="opt${opt.id}">${opt.text}</label>
+               </div>`;
+    });
+    html += '</div>';
+  } else if (q.type === "short_text") {
+    const prev = answers[q.id] || "";
+    html += `<textarea class="form-control mt-3" rows="4" name="q${q.id}">${prev}</textarea>`;
+  } else if (q.type === "audio") {
+  html += `
+    <div class="border rounded p-3 bg-light mt-3">
+      <label class="form-label fw-bold">Record or Upload Audio Answer 🎤</label>
+      <div class="d-flex flex-wrap align-items-center gap-2 my-2 rec-ui">
+        <span id="recDot${q.id}" class="rec-dot" title="Recording indicator"></span>
+        <span id="recTimer${q.id}" class="rec-timer">00:00</span>
+
+        <button type="button" class="btn btn-outline-primary btn-sm recBtn" data-qid="${q.id}">Start</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm toggleBtn" data-qid="${q.id}" disabled>Pause</button>
+        <button type="button" class="btn btn-outline-danger btn-sm stopBtn" data-qid="${q.id}" disabled>Stop</button>
+
+        <audio id="play${q.id}" controls class="d-none" style="max-width:260px;"></audio>
+      </div>
+
+      <p class="small text-muted mb-1">— or upload an audio file —</p>
+      <input type="file" class="form-control form-control-sm" name="q${q.id}" accept="audio/*">
+    </div>`;
+}
+  document.getElementById("questionContainer").innerHTML = html;
+  if (q.type === "audio") {
+    initRecorder(q.id);
+    bindAudioUpload(q.id); // <-- add this
+  applySavedAudioUI(q.id);
+  }
+
+  document.getElementById("prevBtn").disabled = (current <= 1);
+  const nextBtn = document.getElementById("nextBtn");
+  const submitBtn = document.getElementById("submitBtn");
+  if (current < total){
+    nextBtn.classList.remove("d-none");
+    submitBtn.classList.add("d-none");
+  } else {
+    nextBtn.classList.add("d-none");
+    submitBtn.classList.remove("d-none");
+  }
+}
+
+// -------------------- [START] ROBUST RECORDER LOGIC --------------------
+function initRecorder(qid){
+  const recBtn    = document.querySelector(`.recBtn[data-qid="${qid}"]`);
+  const toggleBtn = document.querySelector(`.toggleBtn[data-qid="${qid}"]`); // Pause/Resume
+  const stopBtn   = document.querySelector(`.stopBtn[data-qid="${qid}"]`);
+  const playback  = document.getElementById(`play${qid}`);
+  const dot       = document.getElementById(`recDot${qid}`);
+  const timerEl   = document.getElementById(`recTimer${qid}`);
+
+  if (!navigator.mediaDevices || !recBtn) {
+    if (recBtn) recBtn.disabled = true;
+    if (toggleBtn) toggleBtn.disabled = true;
+    if (stopBtn) stopBtn.disabled = true;
+    return;
+  }
+
+  let recorder, stream, timerId = null, seconds = 0;
+
+  function fmt(s) { const m = String(Math.floor(s/60)).padStart(2,'0'); const ss = String(s%60).padStart(2,'0'); return `${m}:${ss}`; }
+  function startTimer(){ if (timerId) return; timerId = setInterval(()=>{ seconds++; timerEl.textContent = fmt(seconds); }, 1000); }
+  function stopTimer(){ if (timerId) { clearInterval(timerId); timerId = null; } }
+  function resetTimer(){ stopTimer(); seconds = 0; timerEl.textContent = "00:00"; }
+
+  function setActive(btn, pressed=true){
+    [recBtn, toggleBtn, stopBtn].forEach(b => { if (b){ b.classList.remove("active"); b.setAttribute("aria-pressed","false"); }});
+    if (btn){ btn.classList.toggle("active", pressed); btn.setAttribute("aria-pressed", pressed ? "true":"false"); }
+  }
+
+  function stateIdle(){
+    recBtn.disabled=false; toggleBtn.disabled=true; stopBtn.disabled=true;
+    toggleBtn.textContent="Pause";
+    dot.classList.remove("recording","paused"); dot.style.visibility = "hidden";
+    stopTimer(); setActive(null, false);
+  }
+  function stateRecording(){
+    recBtn.disabled=true; toggleBtn.disabled=false; stopBtn.disabled=false;
+    toggleBtn.textContent="Pause";
+    dot.classList.remove("paused"); dot.classList.add("recording"); dot.style.visibility = "visible";
+    startTimer(); setActive(recBtn, true);
+  }
+  function statePaused(){
+    recBtn.disabled=true; toggleBtn.disabled=false; stopBtn.disabled=false;
+    toggleBtn.textContent="Resume";
+    dot.classList.remove("recording"); dot.classList.add("paused"); dot.style.visibility = "visible";
+    stopTimer(); setActive(toggleBtn, true);
+  }
+  function stateStopped(){
+    recBtn.disabled=false; toggleBtn.disabled=true; stopBtn.disabled=true;
+    dot.classList.remove("recording","paused"); dot.style.visibility = "hidden";
+    stopTimer(); setActive(stopBtn, true);
+  }
+  stateIdle();
+
+  recBtn.addEventListener("click", async ()=>{
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({audio:true});
+      recorder = new MediaRecorder(stream, {mimeType:"audio/webm"});
+      const chunks = [];
+      recorder.ondataavailable = e => chunks.push(e.data);
+
+      recorder.onstop = async () => {
+        const blob = new Blob(chunks, {type:"audio/webm"});
+        const url = URL.createObjectURL(blob);
+        playback.src = url;
+        playback.classList.remove("d-none");
+
+        // Upload to temp storage and persist filename
+        const fd = new FormData();
+        fd.append('audio_blob', blob, 'recording.webm');
+        try {
+          const res = await fetch("{{ url_for('tests.upload_audio_chunk') }}", { method: "POST", body: fd });
+          const data = await res.json();
+          if (data.ok) setAudioFilename(qid, data.filename);
+          else alert("Could not upload your recording. Please try again.");
+        } catch (err) {
+          alert("Network error while uploading your recording.");
+        } finally {
+          if (stream) stream.getTracks().forEach(t => t.stop());
+          stateStopped();
+        }
+      };
+
+      // If pause/resume unsupported, keep toggle disabled
+      if (typeof recorder.pause !== "function" || typeof recorder.resume !== "function") {
+        toggleBtn.disabled = true;
+      }
+
+      recorder.start();
+      recorders[qid] = { recorder, stream, timerId, seconds };
+      resetTimer(); stateRecording();
+
+    } catch (e) {
+      alert("Could not access your microphone. Check permissions and reload.");
+    }
+  });
+
+  toggleBtn.addEventListener("click", ()=>{
+    if (!recorder) return;
+    if (recorder.state === "recording" && typeof recorder.pause === "function") {
+      recorder.pause(); statePaused();
+    } else if (recorder.state === "paused" && typeof recorder.resume === "function") {
+      recorder.resume(); stateRecording();
+    }
+  });
+
+  stopBtn.addEventListener("click", ()=>{
+    if (recorder && (recorder.state === "recording" || recorder.state === "paused")) {
+      recorder.stop();
+    }
+  });
+}
+// -------------------- [END] ROBUST RECORDER LOGIC --------------------
+
+function saveCurrentAnswer(){
+  const qContainer = document.getElementById("questionContainer");
+  const inputs = qContainer.querySelectorAll("input, textarea");
+  const currentQID = parseInt(qContainer.querySelector('[name^="q"]')?.name.match(/\d+/)[0]);
+  
+  if (!currentQID) return;
+
+  inputs.forEach(el => {
+    if(el.type === "radio" && el.checked) {
+        answers[currentQID] = parseInt(el.value);
+    } else if(el.tagName === "TEXTAREA" && el.value.trim()) {
+        answers[currentQID] = el.value.trim();
+    }
+    // Note: Audio is not saved to the 'answers' object, it's handled by its own hidden field.
+  });
+}
+
+document.getElementById("testForm").addEventListener("submit", e => {
+    e.preventDefault();
+    saveCurrentAnswer();
+    
+    // This is a failsafe. If any recorder is still active, stop it.
+    Object.values(recorders).forEach(r => {
+        if (r.recorder && r.recorder.state === "recording") {
+            r.recorder.stop();
+        }
+    });
+
+    for(const [qid, val] of Object.entries(answers)){
+        if (!document.querySelector(`[name="q${qid}"]`)) {
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.name = `q${qid}`;
+            input.value = val;
+            e.target.appendChild(input);
+        }
+    }
+    
+    // A short delay to ensure the FileReader has time to finish converting the blob
+    setTimeout(() => {
+        console.log("Submitting form...");
+        e.target.submit();
+    }, 200); // 200ms delay
+});
+
+// --- Timer, Autosave, Navigation, and Initialization ---
+const timeLimitMinutes = {{ test.time_limit or 0 }};
+let totalSeconds = (timeLimitMinutes > 0) 
+    ? ({{ remaining_time or 'null' }} !== null ? {{ remaining_time }} : timeLimitMinutes * 60)
+    : null;
+let timerInterval = null;
+let autosaveInterval = null;
+
+function startTimer(){
+  if (totalSeconds === null) {
+      const el = document.getElementById("progressText");
+      if (el.textContent.indexOf('No Time Limit') === -1) {
+          el.innerHTML += " – ⏳ No Time Limit";
+      }
+      return;
+  }
+  updateClock();
+  timerInterval = setInterval(()=>{
+    totalSeconds--;
+    updateClock();
+    if(totalSeconds <= 0){
+      clearInterval(timerInterval);
+      if(autosaveInterval) clearInterval(autosaveInterval);
+      alert("Time is up! Submitting your test…");
+      document.getElementById("testForm").submit();
+    }
+  }, 1000);
+}
+
+function updateClock(){
+  if (totalSeconds === null) return;
+  const m = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
+  const s = String(totalSeconds % 60).padStart(2, "0");
+  const el = document.getElementById("progressText");
+  const baseText = `Question ${current} of ${total}`;
+  el.textContent = `${baseText} – ⏰ ${m}:${s}`;
+}
+
+function autoSave(){
+  const payload = { answers: answers, current_question: current, remaining_time: totalSeconds };
+  fetch(`/tests/${testId}/autosave`, {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(payload)
+  }).then(r => r.json()).then(d => console.log("Autosaved at", d.saved_at))
+    .catch(err => console.warn("Autosave failed", err));
+}
+
+function startAutosave(){
+  autosaveInterval = setInterval(()=>{
+    saveCurrentAnswer();
+    autoSave();
+  }, 10000);
+}
+
+document.getElementById("nextBtn").addEventListener("click", () => {
+  saveCurrentAnswer();
+  autoSave();
+  if (current < total) {
+    current++;
+    loadQuestion();
+  }
+});
+
+document.getElementById("prevBtn").addEventListener("click", () => {
+  saveCurrentAnswer();
+  autoSave();
+  if (current > 1) {
+    current--;
+    loadQuestion();
+  }
+});
+
+document.getElementById("testForm").addEventListener("submit", e => {
+  e.preventDefault();
+  saveCurrentAnswer();
+
+  // Stop any active recorders (safety)
+  Object.values(recorders).forEach(r => {
+    if (r.recorder && r.recorder.state === "recording") r.recorder.stop();
+  });
+
+  // Ensure text/mcq answers are added (already present in your code) ...
+
+  // Ensure ALL audio filenames are included as hidden inputs
+  for (const [qid, fname] of Object.entries(audioAnswers)) {
+    if (!document.querySelector(`input[name="recorded_audio_${qid}"]`)) {
+      const inp = document.createElement("input");
+      inp.type = "hidden";
+      inp.name = `recorded_audio_${qid}`;
+      inp.value = fname;
+      e.target.appendChild(inp);
+    }
+  }
+
+  setTimeout(() => e.target.submit(), 200);
+});
+
+
+
+function stopActiveRecordingIfAny(){
+  Object.values(recorders).forEach(obj=>{
+    if (!obj || !obj.recorder) return;
+    if (obj.recorder.state === "recording" || obj.recorder.state === "paused") {
+      try { obj.recorder.stop(); } catch(e){}
+    }
+  });
+}
+
+document.getElementById("nextBtn").addEventListener("click", () => {
+  saveCurrentAnswer(); autoSave(); stopActiveRecordingIfAny();
+});
+document.getElementById("prevBtn").addEventListener("click", () => {
+  saveCurrentAnswer(); autoSave(); stopActiveRecordingIfAny();
+});
+
+
+function applySavedAudioUI(qid){
+  const saved = document.querySelector(`input[name="recorded_audio_${qid}"]`);
+  const playback = document.getElementById(`play${qid}`);
+  if (!saved || !playback) return;
+
+  const fname = saved.value;
+  if (!fname) return;
+
+  // Show “saved” indicator (add badge if you want)
+  let existingBadge = document.getElementById(`audioSaved${qid}`);
+  if (!existingBadge) {
+    const ui = document.querySelector(`.recBtn[data-qid="${qid}"]`)?.closest(".rec-ui");
+    if (ui) {
+      const badge = document.createElement("span");
+      badge.id = `audioSaved${qid}`;
+      badge.className = "badge bg-success";
+      badge.textContent = "Saved";
+      ui.appendChild(badge);
+    }
+  }
+
+  // Show playback from temp storage
+  playback.src = `/presentations/media/audio_temp/${encodeURIComponent(fname)}`;
+  playback.classList.remove("d-none");
+}
+
+
+document.addEventListener("DOMContentLoaded", function() {
+    loadQuestion();
+    startTimer();
+    startAutosave();
+});
+</script>
+{% endblock %}

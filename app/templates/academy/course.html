@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid mt-3">
+  <div class="row">
+    <!-- Left: modules -->
+    <div class="col-md-3">
+      <h5>{{ course.title }}</h5>
+      <ul class="list-group">
+        {% for it in course.items %}
+          <li class="list-group-item d-flex justify-content-between {% if it.position==idx %}active{% endif %}">
+            <a class="{% if it.position==idx %}text-white text-decoration-none{% endif %}"
+               href="{{ url_for('academy.module_view', course_id=course.id, idx=it.position) }}">
+               {{ it.position }}. {% if it.type=='library' %}📘{% else %}🧪{% endif %}
+               {{ it.library_item.title if it.library_item_id and it.library_item else it.test.title if it.test_id and it.test else '' }}
+            </a>
+            {% if it.id in completed_ids %}<span class="badge bg-success">✓</span>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <!-- Right: content -->
+    <div class="col-md-9">
+      {% if mod.type == 'library' and mod.library_item_id %}
+        <h4>{{ mod.library_item.title }}</h4>
+        {% set item = mod.library_item %}
+{% include "library/_content_embed.html" %}
+        <form method="POST" action="{{ url_for('academy.mark_complete', course_id=course.id, item_id=mod.id) }}" class="mt-3">
+          <div class="d-flex justify-content-between">
+            <a class="btn btn-secondary" href="{{ url_for('academy.module_view', course_id=course.id, idx=idx-1) }}" {% if idx<=1 %}disabled{% endif %}>← Prev</a>
+            <button class="btn btn-primary">I’ve completed this</button>
+            <a class="btn btn-secondary" href="{{ url_for('academy.module_view', course_id=course.id, idx=idx+1) }}" {% if idx>=total %}disabled{% endif %}>Next →</a>
+          </div>
+        </form>
+
+      {% elif mod.type == 'test' and mod.test_id %}
+        <h4>{{ mod.test.title }}</h4>
+        <p class="text-muted">This module requires taking a test{% if mod.pass_percent %} (pass ≥ {{ mod.pass_percent }}%) {% endif %}{% if mod.require_review %} and review by a manager{% endif %}.</p>
+        <a class="btn btn-success" target="_blank" href="{{ url_for('tests.ready', test_id=mod.test_id) }}">Start Test</a>
+
+        <div id="testStatus" class="alert alert-info mt-3">Waiting for test completion...</div>
+        <div class="d-flex mt-3 gap-2">
+          <a class="btn btn-secondary" href="{{ url_for('academy.module_view', course_id=course.id, idx=idx-1) }}" {% if idx<=1 %}disabled{% endif %}>← Prev</a>
+          <a id="continueBtn" class="btn btn-primary disabled" href="{% if idx >= total %}{{ url_for('academy.course_summary', course_id=course.id) }}{% else %}{{ url_for('academy.module_view', course_id=course.id, idx=idx+1) }}{% endif %}">Continue →</a>
+          <a class="btn btn-outline-secondary" target="_blank" href="{{ url_for('tests.ready', test_id=mod.test_id) }}">Retake</a>
+        </div>
+
+        <script>
+          (function(){
+            const url = "{{ url_for('academy.test_status') }}?test_id={{ mod.test_id }}&pass={{ mod.pass_percent or 0 }}&review={{ 1 if mod.require_review else 0 }}";
+            function poll(){
+              fetch(url).then(r=>r.json()).then(d=>{
+                const s = document.getElementById('testStatus');
+                const c = document.getElementById('continueBtn');
+                if(d.passed){
+                  s.className="alert alert-success"; s.textContent="Test passed. You may continue.";
+                  c.classList.remove('disabled');
+                }else{
+                  s.className="alert alert-warning"; s.textContent="Test not completed/passed yet. Retake or wait for review.";
+                  c.classList.add('disabled');
+                }
+              }).catch(()=>{});
+            }
+            poll();
+            setInterval(poll, 4000);
+          })();
+        </script>
+
+      {% else %}
+        <p class="text-muted">Unknown module type.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if mod.type == 'library' and mod.library_item %}
+  {% with session_item=mod.library_item %}
+    {% include "library/_session_tracker.html" %}
+  {% endwith %}
+{% endif %}
+
+<script>
+  (function(){
+    const url = "{{ url_for('academy.test_status') }}?test_id={{ mod.test_id }}&pass={{ mod.pass_percent or 0 }}&review={{ 1 if mod.require_review else 0 }}";
+    const markUrl = "{{ url_for('academy.mark_complete', course_id=course.id, item_id=mod.id) }}";
+    let marked = false;
+
+    function poll(){
+      fetch(url).then(r=>r.json()).then(d=>{
+        const s = document.getElementById('testStatus');
+        const c = document.getElementById('continueBtn');
+        if(d.passed){
+          s.className="alert alert-success"; s.textContent="Test passed. You may continue.";
+          c.classList.remove('disabled');
+          if(!marked){
+            fetch(markUrl, {method: "POST"}).catch(()=>{});
+            marked = true;
+          }
+        }else{
+          s.className="alert alert-warning"; s.textContent="Test not completed/passed yet. Retake or wait for review.";
+          c.classList.add('disabled');
+        }
+      }).catch(()=>{});
+    }
+    poll();
+    setInterval(poll, 4000);
+  })();
+</script>
+{% endblock %}

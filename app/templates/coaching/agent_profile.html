@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Agent Coaching Profile: {{ agent.name or agent.email }}</h2>
+<table border="1">
+<tr><th>Plan</th><th>Due Date</th><th>Acknowledged</th><th>Views</th><th>Avg Rating</th><th>Avg Score</th></tr>
+{% for d in profile_data %}
+<tr>
+  <td>{{ d.plan }}</td>
+  <td>{{ d.due }}</td>
+  <td>{{ d.ack if d.ack else "❌ Not Acknowledged" }}</td>
+  <td>{{ d.views }}</td>
+  <td>{{ "%.1f"|format(d.avg_rating) }}</td>
+  <td>{{ "%.1f"|format(d.avg_score) }}</td>
+</tr>
+{% endfor %}
+</table>
+
+<hr>
+<h3>Timeline Charts</h3>
+<canvas id="quizTimeline"></canvas>
+<canvas id="ratingTimeline"></canvas>
+<canvas id="viewTimeline"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
+<script>
+const marks={{ chart_data.markers|tojson }};
+const annos=marks.map(m=>({type:'line',xMin:m.date,xMax:m.date,borderColor:'red',label:{enabled:true,content:m.title,rotation:90}}));
+
+new Chart(document.getElementById('quizTimeline'),{
+ type:'line',
+ data:{labels:{{ chart_data.labels|tojson }},datasets:[{label:'Quiz Avg', data:{{ chart_data.quiz_scores|tojson }}, borderColor:'green'}]},
+ options:{plugins:{annotation:{annotations:annos}},scales:{y:{beginAtZero:true,max:100}}}
+});
+new Chart(document.getElementById('ratingTimeline'),{
+ type:'line',
+ data:{labels:{{ chart_data.rating_labels|tojson }},datasets:[{label:'Ratings', data:{{ chart_data.ratings|tojson }}, borderColor:'purple'}]},
+ options:{plugins:{annotation:{annotations:annos}},scales:{y:{beginAtZero:true,max:5}}}
+});
+new Chart(document.getElementById('viewTimeline'),{
+ type:'line',
+ data:{labels:{{ chart_data.view_labels|tojson }},datasets:[{label:'Views', data:{{ chart_data.views|tojson }}, borderColor:'orange'}]},
+ options:{plugins:{annotation:{annotations:annos}},scales:{y:{beginAtZero:true}}}
+});
+</script>
+{% endblock %}

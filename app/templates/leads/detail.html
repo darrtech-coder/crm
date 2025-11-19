@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <a href="{{ url_for('leads.index') }}" class="btn btn-secondary mb-3">&larr; Back to All Leads</a>
+
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <h3>Lead Details: {{ lead.name }}</h3>
+        </div>
+        <div class="card-body">
+            <p><strong>Phone:</strong> {{ lead.phone }}</p>
+            <p><strong>Email:</strong> {{ lead.email or 'N/A' }}</p>
+            <p><strong>Status:</strong> {{ lead.status }}</p>
+            <p><strong>Review Status:</strong> {{ lead.review_status }}</p>
+            <p><strong>Submitted By:</strong> {{ lead.creator.username }} on {{ lead.created_at | tz('%Y-%m-%d') }} </p>
+            <p><strong>Assigned To:</strong> {{ lead.assignee.username if lead.assignee else 'Unassigned' }}</p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mt-4">
+        <div class="card-header">
+            <h4>Notes</h4>
+        </div>
+        <div class="card-body">
+            {% if current_user.role != "AGENT" or lead.assigned_to == current_user.id %}
+                <!-- Form to add a new note -->
+                <form method="POST" action="{{ url_for('leads.add_note', lead_id=lead.id) }}" class="mb-4">
+                    <div class="mb-3">
+                        <label for="note" class="form-label">Add a new note</label>
+                        <textarea class="form-control" id="note" name="note" rows="3" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Note</button>
+                </form>
+            {% endif %}
+
+            <!-- List of existing notes -->
+            <ul class="list-group">
+                {% for note in lead.notes %}
+                <li class="list-group-item">
+                    <p class="mb-1">{{ note.note }}</p>
+                    <small class="text-muted">
+                        &mdash; by {{ note.author.username }} on {{ note.created_at | tz('%Y-%m-%d %H:%M') }}
+                    </small>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted">No notes yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

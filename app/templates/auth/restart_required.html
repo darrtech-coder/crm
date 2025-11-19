@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card shadow-lg border-0 rounded-lg mt-5 text-center">
+      <div class="card-body p-5">
+        <h1 class="text-success">✅</h1>
+        <h3 class="mb-3">Setup Complete!</h3>
+        <p class="lead">The database has been configured and the administrator account has been created.</p>
+        <hr>
+        <p class="fw-bold text-danger">A server restart is required to apply the new database configuration.</p>
+        <p class="text-muted">Please restart the application server process manually. After restarting, you can log in.</p>
+        
+        <div class="mt-4">
+          <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-lg">Go to Login Page</a>
+        </div>
+        <small class="d-block mt-2 text-muted">(Clicking the button will take you to the login page, but it will not work until the server process is manually restarted.)</small>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+<label class="form-label">Timezone</label>
+{# Reusable timezone dropdown #}
+{# expects tz_list, and either settings.timezone OR selected_tz #}
+{% set selected = selected_tz or (settings.timezone if settings is defined else 'UTC') %}
+{% set field = field_name or 'timezone' %}
+<label class="form-label">Timezone</label>
+<select name="{{ field }}" class="form-select">
+  {% for tz in tz_list %}
+    <option value="{{ tz }}" {% if tz == selected %}selected{% endif %}>{{ tz }}</option>
+  {% endfor %}
+</select>
+<small class="text-muted">Used for displaying times in the UI.</small>

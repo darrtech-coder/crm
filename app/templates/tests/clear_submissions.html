@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>🧹 Clear Test Data</h2>
+  <p class="text-muted">Delete test submissions (and answers) by test and/or age.</p>
+  <form method="POST" class="card p-3 shadow-sm">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Test</label>
+        <select name="test_id" class="form-select">
+          <option value="all">All Tests</option>
+          {% for t in tests %}
+            <option value="{{ t.id }}">{{ t.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Age</label>
+        <select name="age" class="form-select">
+          <option value="all">All time</option>
+          <option value="7d">Older than 1 week</option>
+          <option value="30d">Older than 1 month</option>
+          <option value="90d">Older than 3 months</option>
+        </select>
+      </div>
+    </div>
+    <div class="alert alert-warning mt-3">
+      This action is irreversible. Consider exporting data before purging.
+    </div>
+    <button class="btn btn-danger" onclick="return confirm('This will permanently delete submissions. Continue?')">
+      Delete
+    </button>
+  </form>
+</div>
+{% endblock %}

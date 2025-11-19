@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Academy — Manage Courses</h2>
+    <a class="btn btn-success" href="{{ url_for('academy.course_new') }}">+ New Course</a>
+  </div>
+
+  <table class="table table-striped">
+    <thead><tr><th>Title</th><th>Modules</th><th>Published</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for c in courses %}
+      <tr>
+        <td>{{ c.title }}</td>
+        <td>{{ c.items|length }}</td>
+        <td>{{ "Yes" if c.published else "No" }}</td>
+        <td>
+          <a class="btn btn-sm btn-primary" href="{{ url_for('academy.course_edit', course_id=c.id) }}">Edit</a>
+          <a class="btn btn-sm btn-info" href="{{ url_for('academy.modules', course_id=c.id) }}">Modules</a>
+          <form method="POST" action="{{ url_for('academy.course_delete', course_id=c.id) }}" class="d-inline" onsubmit="return confirm('Delete this course?');">
+            <button class="btn btn-sm btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="text-muted">No courses yet</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
