@@ -111,6 +111,14 @@
         <button onclick="resetPW({{u.id}})" class="btn btn-secondary btn-sm">Reset PW</button>
         <button onclick="unlockUser({{u.id}})" class="btn btn-info btn-sm">Unlock</button>
 
+    {# Only SUPER_ADMIN sees the delete button, and only for disabled users #}
+    {% if current_user.role == "SUPER_ADMIN" and u.disabled %}
+      <button onclick="deleteUser({{u.id}})" class="btn btn-danger btn-sm mt-1">
+        Delete
+      </button>
+    {% endif %}
+
+
 <div class="input-group input-group-sm mt-2" style="max-width:260px;">
   <input class="form-control" id="name-{{u.id}}" placeholder="New name" value="{{ u.name or '' }}">
   <button class="btn btn-outline-primary" onclick="setName({{u.id}})">Save</button>
@@ -170,5 +178,26 @@ function setName(id){
     else alert("Name updated");
   });
 }
+
+function deleteUser(uid) {
+  if (!confirm("Permanently delete this user? This cannot be undone.")) {
+    return;
+  }
+  fetch(`/dashboard/admin/users/${uid}/delete`, {
+    method: "POST"
+  }).then(r => r.json()).then(d => {
+    if (!d.ok) {
+      alert(d.error || "Failed to delete user");
+    } else {
+      location.reload();
+    }
+  }).catch(err => {
+    alert("Network error while deleting user");
+    console.error(err);
+  });
+}
+
+
+
 </script>
 {% endblock %}

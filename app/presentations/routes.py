@@ -1,5 +1,7 @@
 import os
 import glob
+import io   # <-- ADD THIS LINE
+from io import BytesIO
 from flask import render_template, request, redirect, url_for, flash, jsonify, send_from_directory, session
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -194,7 +196,7 @@ def upload_media():
         db.session.commit()
 
         # storage.get_url will correctly generate either a local or remote URL
-        file_url = storage.get_url("crm/" + saved_path)
+        file_url = storage.get_url(saved_path)
 
         if request.form:
             flash("Media uploaded successfully.", "success")
@@ -224,7 +226,7 @@ def media_file(filename):
         return redirect(storage.get_url(filename), code=301)
     
     # Check for old format: e.g., 'file.jpg' (assume it's in presentations/media)
-    potential_path = f"presentations/media/{filename}"
+    potential_path = f"media/{filename}"
     if storage.fs.exists(potential_path):
         return redirect(storage.get_url(potential_path), code=301)
         
@@ -399,6 +401,9 @@ def confirm_import():
 
 
 
+# -----------------------------------------------------------------------------
+# Helper: Extract Content from PPTX Slide (FIXED)
+# -----------------------------------------------------------------------------
 def extract_slide_content(slide):
     """
     Extract text/media from pptx slide into semantic HTML.
@@ -443,25 +448,37 @@ def extract_slide_content(slide):
         if shape.shape_type == MSO_SHAPE_TYPE.PICTURE or hasattr(shape, "image"):
             try:
                 image = shape.image
-                ext = image.ext  # usually 'png', 'jpeg'
+                ext = image.ext or "png"  # usually 'png', 'jpeg'
                 img_name = f"{current_user.id}_{image.sha1}.{ext}"
-                fpath = os.path.join(UPLOAD_MEDIA_DIR, img_name)
 
-                if not os.path.exists(fpath):
-                    with open(fpath, "wb") as f:
-                        f.write(image.blob)
+                # Save into abstract storage (local/S3/GCS) instead of UPLOAD_MEDIA_DIR
+                buf = BytesIO(image.blob)
+                # store under 'presentations/media'
+                saved_path = storage.save(buf, subfolder="presentations/media", filename=img_name)
+                # normalize path for URLs
+                saved_path = saved_path.replace("\\", "/")
 
-                url = url_for("presentations.media_file", filename=img_name, _external=False)
+                # Track in DB so Media Manager can see it (optional but useful)
+                if not MediaFile.query.filter_by(filename=saved_path).first():
+                    db.session.add(MediaFile(filename=saved_path, user_id=current_user.id))
+
+                # Generate correct public URL (local or remote)
+                url = storage.get_url(saved_path)
+
                 content.append(f'<img src="{url}" class="slide-img" />')
             except Exception as e:
-                print(f"Image extract error: {e}")
+                current_app.logger.error(f"Image extract error: {e}")
 
         # --- Embedded media (audio/video placeholders) ---
         if hasattr(shape, "media_type"):
             if shape.media_type == "video":
-                content.append('<video controls class="slide-video"><source src="movie.mp4" type="video/mp4"></video>')
+                content.append(
+                    '<video controls class="slide-video"><source src="movie.mp4" type="video/mp4"></video>'
+                )
             elif shape.media_type == "audio":
-                content.append('<audio controls class="slide-audio"><source src="audio.mp3" type="audio/mpeg"></audio>')
+                content.append(
+                    '<audio controls class="slide-audio"><source src="audio.mp3" type="audio/mpeg"></audio>'
+                )
 
     return "\n".join(content) if content else "<p>(empty slide)</p>"
 
@@ -930,11 +947,7 @@ def import_pdf():
             flash("Please upload a valid PDF file","danger")
             return redirect(url_for("presentations.import_pdf"))
 
-        fname = secure_filename(pdf_file.filename)
-        fpath = os.path.join(UPLOAD_MEDIA_DIR, fname)
-        pdf_file.save(fpath)
-
-        # ✅ Create new presentation
+        # Create new presentation
         pres = Presentation(
             title=title,
             creator_id=current_user.id,
@@ -943,34 +956,56 @@ def import_pdf():
         db.session.add(pres)
         db.session.commit()
 
-        # ✅ Convert pages into images
-        poppler_path = ensure_poppler()  # Windows returns path, Linux/mac just None
-        pages = convert_from_path(fpath, dpi=150, poppler_path=poppler_path)
-        if reverse:
-            pages = list(reversed(pages))
+        # Save PDF temporarily for conversion
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_pdf:
+            pdf_file.save(tmp_pdf.name)
+            pdf_path = tmp_pdf.name
 
-        for idx, page in enumerate(pages):
-            slide_img = f"slide_{pres.id}_{idx}.jpg"
-            slide_path = os.path.join(UPLOAD_MEDIA_DIR, "slides", slide_img)
-            page.save(slide_path, "JPEG")
+        try:
+            poppler_path = ensure_poppler()
+            pages = convert_from_path(pdf_path, dpi=150, poppler_path=poppler_path)
+            if reverse:
+                pages = list(reversed(pages))
 
+            for idx, page in enumerate(pages):
+                slide_filename = f"slide_{pres.id}_{idx}.jpg"
+                
+                # Save page image to temp file
+                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp_img:
+                    page.save(tmp_img.name, "JPEG")
+                    tmp_img_path = tmp_img.name
 
-            media = MediaFile(filename="slides/"+slide_img, user_id=current_user.id)
-            db.session.add(media)
+                # Upload to storage
+                with open(tmp_img_path, 'rb') as f:
+                    saved_path = storage.save(f, subfolder='presentations/slides', filename=slide_filename)
+                
+                os.remove(tmp_img_path) # Clean up temp image
 
+                # Track media
+                media = MediaFile(filename=saved_path, user_id=current_user.id)
+                db.session.add(media)
 
-            client_content = f'<img src="/presentations/media/slides/{slide_img}">'
-            agent_notes = "" if skip_notes else "(add notes here)"
+                # Get URL
+                url = storage.get_url(saved_path)
+                client_content = f'<img src="{url}" class="slide-img" style="max-width:100%">'
+                agent_notes = "" if skip_notes else "(add notes here)"
 
-            db.session.add(Slide(
-                presentation_id=pres.id,
-                position=idx,
-                client_content=client_content,
-                agent_notes=agent_notes
-            ))
+                db.session.add(Slide(
+                    presentation_id=pres.id,
+                    position=idx,
+                    client_content=client_content,
+                    agent_notes=agent_notes
+                ))
 
-        db.session.commit()
-        flash("PDF imported successfully","success")
+            db.session.commit()
+            flash("PDF imported successfully","success")
+        except Exception as e:
+            current_app.logger.error(f"PDF Import failed: {e}")
+            flash(f"Failed to import PDF: {e}", "danger")
+        finally:
+            if os.path.exists(pdf_path):
+                os.remove(pdf_path)
+
         return redirect(url_for("presentations.index"))
 
     return render_template("presentations/import_pdf.html")

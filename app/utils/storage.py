@@ -1,4 +1,4 @@
-from flask import current_app
+from flask import current_app, url_for
 from fs.base import FS
 from fs_s3fs import S3FS
 from fs_gcsfs import GCSFS

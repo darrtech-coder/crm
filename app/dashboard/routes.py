@@ -698,6 +698,53 @@ def storage_migration():
         current_app.logger.error(f"Storage migration failed: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
+@dashboard_bp.route("/admin/users/<int:user_id>/delete", methods=["POST"])
+@login_required
+def delete_user(user_id):
+    if current_user.role != "SUPER_ADMIN":
+        return jsonify({"ok": False, "error": "Unauthorized"}), 403
+
+    u = User.query.get_or_404(user_id)
+
+    # Never allow deleting SUPER_ADMIN
+    if u.role == "SUPER_ADMIN":
+        return jsonify({"ok": False, "error": "Cannot delete SUPER_ADMIN"}), 400
+
+    # Require that the user is already disabled
+    if not u.disabled:
+        return jsonify({"ok": False, "error": "User must be disabled before deletion."}), 400
+
+    try:
+        # Clean up some simple related data to reduce FK issues.
+        # We *do not* try to delete content they created – if they have a lot of
+        # dependent data, the delete may still fail, and we surface a clear error.
+
+        from ..teams.models import TeamMember
+        from ..notifications.models import Notification
+        from ..security.models import UserSession
+        from ..messaging.models import Friendship, ChatParticipant
+
+        TeamMember.query.filter_by(user_id=u.id).delete(synchronize_session=False)
+        Notification.query.filter_by(user_id=u.id).delete(synchronize_session=False)
+        UserSession.query.filter_by(user_id=u.id).delete(synchronize_session=False)
+        Friendship.query.filter(
+            (Friendship.user_id == u.id) | (Friendship.friend_id == u.id)
+        ).delete(synchronize_session=False)
+        ChatParticipant.query.filter_by(user_id=u.id).delete(synchronize_session=False)
+
+        db.session.delete(u)
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        current_app.logger.error(f"Failed to delete user {u.id}: {e}")
+        db.session.rollback()
+        # If there are still FK constraints (e.g. created tests, library items), 
+        # we prevent deletion and ask the admin to keep the user disabled.
+        return jsonify({
+            "ok": False,
+            "error": "Delete failed due to related data. Keep user disabled instead."
+        }), 500
+
 
 
 
