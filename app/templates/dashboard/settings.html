@@ -38,6 +38,42 @@
         </div>
 
         <hr>
+        <h4>Resource Monitoring</h4>
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label class="form-label">Sampling Interval (seconds)</label>
+                <input type="number" class="form-control" name="resource_interval" min="10"
+                       value="{{ settings.resource_interval or 60 }}">
+                <small class="text-muted">How often to record CPU/RAM/disk usage.</small>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">CPU Alert Threshold (%)</label>
+                <input type="number" class="form-control" name="cpu_alert_percent" min="0" max="100"
+                       value="{{ settings.cpu_alert_percent }}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Memory Alert Threshold (%)</label>
+                <input type="number" class="form-control" name="mem_alert_percent" min="0" max="100"
+                       value="{{ settings.mem_alert_percent }}">
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label class="form-label">Disk Alert Threshold (%)</label>
+                <input type="number" class="form-control" name="disk_alert_percent" min="0" max="100"
+                       value="{{ settings.disk_alert_percent }}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Storage Limit (GB)</label>
+                <input type="number" step="0.1" class="form-control" name="storage_limit_gb"
+                       value="{{ (settings.storage_limit_bytes|int / (1024**3)) if settings.storage_limit_bytes else '' }}"
+                       placeholder="e.g. 10">
+                <small class="text-muted">Total storage capacity you’ve paid for.</small>
+            </div>
+        </div>
+
+
+        <hr>
         <!-- Infrastructure -->
         <h4>Infrastructure</h4>
         <div class="row mb-3">
@@ -50,6 +86,11 @@
                     <option value="none" {{ 'selected' if settings.redis_mode=='none' }}>None (disable)</option>
                 </select>
             </div>
+
+
+
+
+
             <div class="col-md-4" id="redis_url_wrap" style="display: none;">
                 <label class="form-label">Redis URL</label>
                 <input class="form-control" name="redis_url" id="redis_url" placeholder="redis://:password@host:6379/0" value="{{ settings.redis_url or '' }}">

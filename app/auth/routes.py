@@ -200,7 +200,7 @@ def register():
 # -----------------------------
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
-    if not os.path.exists('.env'):
+    if os.environ.get("DISABLE_SETUP_WIZARD") != "1" and  not os.path.exists('.env'):
         return redirect(url_for('auth.setup'))
         
     if not ensure_db_ready():

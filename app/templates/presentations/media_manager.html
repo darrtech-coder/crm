@@ -17,7 +17,7 @@
   <div class="row">
     {% for f in files %}
     <div class="col-md-3 mb-3">
-      <div class="card h-100">
+      <div class="card h-100" id="media-card-{{ f.id }}">
         {% set fname = f.filename.lower() %}
         {% set thumb = f.filename.rsplit('.',1)[0] ~ '_thumb.jpg' %}
         {% set filenames = files | map(attribute='filename') | list %}
@@ -77,6 +77,7 @@ function deleteFile(mediaId){
           const card = document.getElementById(`media-card-${mediaId}`);
           if (card) {
               card.remove();
+          alert("Media file deleted.");
           }
         } else { 
           alert("Error: " + (d.error || 'Unknown error occurred.')); 

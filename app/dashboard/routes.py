@@ -20,6 +20,7 @@ from fs.copy import copy_fs
 
 
 from ..activity.models import LibrarySession
+from ..system_monitor.models import SystemMetric
 
 
 
@@ -51,18 +52,63 @@ def index():
 @dashboard_bp.route("/super_admin")
 @login_required
 def super_admin():
-    if current_user.role!="SUPER_ADMIN": return redirect(url_for("dashboard.index"))
-    return render_template("dashboard/super_admin.html", user=current_user)
+    if current_user.role != "SUPER_ADMIN":
+        return redirect(url_for("dashboard.index"))
+
+    # Storage summary
+    from ..utils.settings import get_setting
+
+    total_bytes = int(get_setting("STORAGE_TOTAL_BYTES", "0") or 0)
+    limit_bytes = int(get_setting("STORAGE_LIMIT_BYTES", "0") or 0)
+
+    if limit_bytes > 0:
+        percent = int(round((total_bytes / limit_bytes) * 100))
+    else:
+        percent = None
+
+    return render_template(
+        "dashboard/super_admin.html",
+        user=current_user,
+        storage_total_bytes=total_bytes,
+        storage_limit_bytes=limit_bytes,
+        storage_percent=percent,
+    )
 
 @dashboard_bp.route("/admin")
 @login_required
 def admin():
-    if current_user.role not in ("ADMIN","SUPER_ADMIN"): return redirect(url_for("dashboard.index"))
+    if current_user.role not in ("ADMIN", "SUPER_ADMIN"):
+        return redirect(url_for("dashboard.index"))
+
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
-    pagination = User.query.order_by(User.id.desc()).paginate(page=page, per_page=per_page, error_out=False)
-    return render_template("dashboard/admin.html", user=current_user, users=pagination.items, pagination=pagination, per_page=per_page)
+    pagination = User.query.order_by(User.id.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
 
+    # Storage summary (percentage only for Admins)
+    from ..utils.settings import get_setting
+
+    total_bytes = int(get_setting("STORAGE_TOTAL_BYTES", "0") or 0)
+    limit_bytes = int(get_setting("STORAGE_LIMIT_BYTES", "0") or 0)
+
+    if limit_bytes > 0:
+        storage_percent = int(round((total_bytes / limit_bytes) * 100))
+        has_storage_limit = True
+    else:
+        storage_percent = None
+        has_storage_limit = False
+
+    return render_template(
+        "dashboard/admin.html",
+        user=current_user,
+        users=pagination.items,
+        pagination=pagination,
+        per_page=per_page,
+        storage_percent=storage_percent,
+        has_storage_limit=has_storage_limit,
+    )
+ 
 
 @dashboard_bp.route("/users")
 @login_required
@@ -188,6 +234,21 @@ def super_admin_settings():
 
         # [NEW] Save storage prefix
         set_setting("STORAGE_PREFIX", request.form.get("storage_prefix", "crm").strip('/'))
+
+        # Resource Monitor Settings
+        set_setting("RESOURCE_SAMPLING_SECONDS", request.form.get("resource_interval", "60") or "60")
+        set_setting("CPU_ALERT_PERCENT", request.form.get("cpu_alert_percent", "90") or "90")
+        set_setting("MEM_ALERT_PERCENT", request.form.get("mem_alert_percent", "90") or "90")
+        set_setting("DISK_ALERT_PERCENT", request.form.get("disk_alert_percent", "90") or "90")
+
+        limit_gb_str = request.form.get("storage_limit_gb", "").strip()
+        try:
+            limit_gb = float(limit_gb_str) if limit_gb_str else 0
+            limit_bytes = int(limit_gb * 1024**3)
+        except ValueError:
+            limit_bytes = 0
+
+        set_setting("STORAGE_LIMIT_BYTES", limit_bytes)
         
         gcs_keyfile = request.files.get("gcs_keyfile_upload")
         if gcs_keyfile and gcs_keyfile.filename:
@@ -223,7 +284,12 @@ def super_admin_settings():
         "s3_cdn_url": get_setting("S3_CDN_URL", ""),
         "gcs_bucket": get_setting("GCS_BUCKET", ""),
         "gcs_cdn_url": get_setting("GCS_CDN_URL", ""),
-        "gcs_keyfile_path": get_setting("GCS_KEYFILE_PATH", "")
+        "gcs_keyfile_path": get_setting("GCS_KEYFILE_PATH", ""),
+        "resource_interval": int(get_setting("RESOURCE_SAMPLING_SECONDS", "60")),
+        "cpu_alert_percent": int(get_setting("CPU_ALERT_PERCENT", "90")),
+        "mem_alert_percent": int(get_setting("MEM_ALERT_PERCENT", "90")),
+        "disk_alert_percent": int(get_setting("DISK_ALERT_PERCENT", "90")),
+        "storage_limit_bytes": int(get_setting("STORAGE_LIMIT_BYTES", "0") or 0),
     }
     # [THIS IS THE FIX] Pass tz_list to the template
     return render_template("dashboard/settings.html", settings=vals, tz_list=TZ_LIST)
@@ -744,6 +810,96 @@ def delete_user(user_id):
             "ok": False,
             "error": "Delete failed due to related data. Keep user disabled instead."
         }), 500
+
+
+@dashboard_bp.route("/super_admin/system_metrics")
+@login_required
+def system_metrics():
+    if current_user.role != "SUPER_ADMIN":
+        return redirect(url_for("dashboard.index"))
+
+    from sqlalchemy import func
+
+    now = datetime.utcnow()
+
+    # --- Last 24h for line charts ---
+    since_24h = now - timedelta(hours=24)
+    recent = (
+        SystemMetric.query
+        .filter(SystemMetric.ts >= since_24h)
+        .order_by(SystemMetric.ts.asc())
+        .all()
+    )
+
+    cpu = [m.cpu_percent for m in recent]
+    mem = [m.mem_percent for m in recent]
+    disk = [m.disk_percent for m in recent]
+    storage_gb = [
+        (m.storage_total_bytes or 0) / (1024**3) for m in recent
+    ]
+
+    # --- Daily aggregates for last 7 days ---
+    seven_days_ago = now - timedelta(days=7)
+    dialect = db.engine.dialect.name
+
+    if dialect == "sqlite":
+        day_expr = func.date(SystemMetric.ts)  # 'YYYY-MM-DD' string
+    elif dialect == "postgresql":
+        day_expr = func.date_trunc("day", SystemMetric.ts)
+    else:
+        day_expr = func.date(SystemMetric.ts)
+
+    daily_rows = (
+        db.session.query(
+            day_expr.label("day"),
+            func.avg(SystemMetric.cpu_percent).label("cpu_avg"),
+            func.max(SystemMetric.cpu_percent).label("cpu_max"),
+            func.avg(SystemMetric.mem_percent).label("mem_avg"),
+            func.max(SystemMetric.mem_percent).label("mem_max"),
+            func.avg(SystemMetric.disk_percent).label("disk_avg"),
+            func.max(SystemMetric.disk_percent).label("disk_max"),
+            func.avg(SystemMetric.storage_total_bytes).label("storage_avg"),
+            func.max(SystemMetric.storage_total_bytes).label("storage_max"),
+        )
+        .filter(SystemMetric.ts >= seven_days_ago)
+        .group_by(day_expr)
+        .order_by(day_expr.asc())
+        .all()
+    )
+
+    daily_cpu_avg = [float(row.cpu_avg or 0) for row in daily_rows]
+    daily_cpu_max = [float(row.cpu_max or 0) for row in daily_rows]
+    daily_mem_avg = [float(row.mem_avg or 0) for row in daily_rows]
+    daily_mem_max = [float(row.mem_max or 0) for row in daily_rows]
+    daily_disk_avg = [float(row.disk_avg or 0) for row in daily_rows]
+    daily_disk_max = [float(row.disk_max or 0) for row in daily_rows]
+
+    daily_storage_avg_gb = [
+        float((row.storage_avg or 0) / (1024**3)) for row in daily_rows
+    ]
+    daily_storage_max_gb = [
+        float((row.storage_max or 0) / (1024**3)) for row in daily_rows
+    ]
+
+    return render_template(
+        "dashboard/system_metrics.html",
+        recent=recent,
+        daily_rows=daily_rows,
+        cpu=cpu,
+        mem=mem,
+        disk=disk,
+        storage_gb=storage_gb,
+        daily_cpu_avg=daily_cpu_avg,
+        daily_cpu_max=daily_cpu_max,
+        daily_mem_avg=daily_mem_avg,
+        daily_mem_max=daily_mem_max,
+        daily_disk_avg=daily_disk_avg,
+        daily_disk_max=daily_disk_max,
+        daily_storage_avg_gb=daily_storage_avg_gb,
+        daily_storage_max_gb=daily_storage_max_gb,
+    )
+
+
 
 
 

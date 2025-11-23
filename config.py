@@ -36,6 +36,8 @@ class Config:
     # Google Cloud Storage Config
     GCS_KEYFILE_PATH = os.environ.get("GCS_KEYFILE_PATH", "") # Path to the JSON keyfile
     GCS_BUCKET = os.environ.get("GCS_BUCKET", "")
+    ENABLE_RESOURCE_MONITOR = True
+    RESOURCE_SAMPLING_SECONDS = 60
 
 class DevConfig(Config):
     DEBUG = True

@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block content %}
+<a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary mb-3">&larr; Back</a>
+<div class="container mt-4">
+  <h2>System Resource Usage</h2>
+  <p class="text-muted">CPU, memory, disk, and storage usage for this application container.</p>
+
+  <h4>Last 24 Hours</h4>
+  <canvas id="cpuChart" height="80"></canvas>
+  <canvas id="memChart" height="80" class="mt-3"></canvas>
+  <canvas id="diskChart" height="80" class="mt-3"></canvas>
+  <canvas id="storageChart" height="80" class="mt-3"></canvas>
+
+  <hr class="my-4">
+
+  <h4>Daily Averages (Last 7 Days)</h4>
+  <canvas id="dailyChart" height="100"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Time labels in the configured timezone (per-user if set).
+const labels = {{ recent
+    | map(attribute='ts')
+    | map('tz', "%H:%M")
+    | list
+    | tojson
+}};
+
+const cpu = {{ cpu|tojson }};
+const mem = {{ mem|tojson }};
+const disk = {{ disk|tojson }};
+const storage = {{ storage_gb|tojson }};
+
+// Daily labels: each aggregated 'day' formatted via tz filter.
+const dailyLabels = {{ daily_rows
+    | map(attribute='day')
+    | map('tz', "%Y-%m-%d")
+    | list
+    | tojson
+}};
+
+const dailyCpuAvg = {{ daily_cpu_avg|tojson }};
+const dailyCpuMax = {{ daily_cpu_max|tojson }};
+const dailyMemAvg = {{ daily_mem_avg|tojson }};
+const dailyMemMax = {{ daily_mem_max|tojson }};
+const dailyDiskAvg = {{ daily_disk_avg|tojson }};
+const dailyDiskMax = {{ daily_disk_max|tojson }};
+const dailyStorageAvg = {{ daily_storage_avg_gb|tojson }};
+const dailyStorageMax = {{ daily_storage_max_gb|tojson }};
+
+// CPU
+new Chart(document.getElementById('cpuChart'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: 'CPU %',
+      data: cpu,
+      borderColor: 'rgb(75, 192, 192)',
+      fill: false,
+      tension: 0.1,
+    }]
+  },
+  options: { scales: { y: { beginAtZero: true, max: 100 } } }
+});
+
+// Memory
+new Chart(document.getElementById('memChart'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: 'Memory %',
+      data: mem,
+      borderColor: 'rgb(255, 159, 64)',
+      fill: false,
+      tension: 0.1,
+    }]
+  },
+  options: { scales: { y: { beginAtZero: true, max: 100 } } }
+});
+
+// Disk
+new Chart(document.getElementById('diskChart'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: 'Disk %',
+      data: disk,
+      borderColor: 'rgb(153, 102, 255)',
+      fill: false,
+      tension: 0.1,
+    }]
+  },
+  options: { scales: { y: { beginAtZero: true, max: 100 } } }
+});
+
+// Storage (GB)
+new Chart(document.getElementById('storageChart'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: 'Storage used (GB)',
+      data: storage,
+      borderColor: 'rgb(54, 162, 235)',
+      fill: false,
+      tension: 0.1,
+    }]
+  },
+  options: { scales: { y: { beginAtZero: true } } }
+});
+
+// Daily chart: CPU/MEM/DISK % + Storage GB
+new Chart(document.getElementById('dailyChart'), {
+  type: 'bar',
+  data: {
+    labels: dailyLabels,
+    datasets: [
+      {
+        label: 'CPU avg %',
+        data: dailyCpuAvg,
+        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+        yAxisID: 'y',
+      },
+      {
+        label: 'CPU max %',
+        data: dailyCpuMax,
+        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+        yAxisID: 'y',
+      },
+      {
+        label: 'Mem avg %',
+        data: dailyMemAvg,
+        backgroundColor: 'rgba(255, 159, 64, 0.6)',
+        yAxisID: 'y',
+      },
+      {
+        label: 'Mem max %',
+        data: dailyMemMax,
+        backgroundColor: 'rgba(255, 159, 64, 0.2)',
+        yAxisID: 'y',
+      },
+      {
+        label: 'Disk avg %',
+        data: dailyDiskAvg,
+        backgroundColor: 'rgba(153, 102, 255, 0.6)',
+        yAxisID: 'y',
+      },
+      {
+        label: 'Disk max %',
+        data: dailyDiskMax,
+        backgroundColor: 'rgba(153, 102, 255, 0.2)',
+        yAxisID: 'y',
+      },
+      {
+        label: 'Storage avg (GB)',
+        data: dailyStorageAvg,
+        type: 'line',
+        borderColor: 'rgb(54, 162, 235)',
+        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+        yAxisID: 'y1',
+        tension: 0.1,
+        fill: false,
+      },
+      {
+        label: 'Storage max (GB)',
+        data: dailyStorageMax,
+        type: 'line',
+        borderColor: 'rgb(0, 99, 132)',
+        backgroundColor: 'rgba(0, 99, 132, 0.2)',
+        yAxisID: 'y1',
+        tension: 0.1,
+        fill: false,
+      },
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: 100,
+        position: 'left',
+        title: { display: true, text: '% (CPU/Mem/Disk)' }
+      },
+      y1: {
+        beginAtZero: true,
+        position: 'right',
+        grid: { drawOnChartArea: false },
+        title: { display: true, text: 'Storage (GB)' }
+      }
+    },
+    plugins: {
+      legend: { position: 'bottom' }
+    }
+  }
+});
+</script>
+{% endblock %}

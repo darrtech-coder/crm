@@ -649,12 +649,124 @@ def archive_item(item_id):
 
 @library_bp.route("/item/<int:item_id>/delete", methods=["POST"])
 @login_required
-@role_required("ADMIN","SUPER_ADMIN")
+@role_required("ADMIN", "SUPER_ADMIN")
 def delete_item(item_id):
+    from .models import (
+        LibraryView,
+        LibraryRating,
+        QuizAttempt,
+        LibraryAccess,
+        LibraryBias,
+        BiasLog,
+        LibraryPrerequisite,
+        LibraryProgress,
+        TrendingItem,
+        LibraryAttachment,
+        FAQ,
+        QuizQuestion,
+        QuizOption,
+    )
+    from app.activity.models import LibrarySession
+    from app.academy.models import AcademyCourseItem, AcademyModuleStatus
+    from app.coaching.models import CoachingPlanItem
+    from app.tests.models import TestCourseRequirement
+
     item = LibraryItem.query.get_or_404(item_id)
-    db.session.delete(item)
-    db.session.commit()
-    flash("Item permanently deleted", "danger")
+
+    try:
+        # --- Delete dependent records that reference this item ---
+
+        # Activity sessions
+        LibrarySession.query.filter_by(item_id=item.id).delete(synchronize_session=False)
+
+        # Views, ratings, quiz attempts
+        LibraryView.query.filter_by(item_id=item.id).delete(synchronize_session=False)
+        LibraryRating.query.filter_by(item_id=item.id).delete(synchronize_session=False)
+        QuizAttempt.query.filter_by(item_id=item.id).delete(synchronize_session=False)
+
+        # Access rules & bias/trending
+        LibraryAccess.query.filter_by(item_id=item.id).delete(synchronize_session=False)
+        LibraryBias.query.filter_by(item_id=item.id).delete(synchronize_session=False)
+        BiasLog.query.filter_by(item_id=item.id).delete(synchronize_session=False)
+        TrendingItem.query.filter_by(item_id=item.id).delete(synchronize_session=False)
+
+        # Progress
+        LibraryProgress.query.filter_by(item_id=item.id).delete(synchronize_session=False)
+
+        # Prerequisite links (this item as parent or as prereq)
+        LibraryPrerequisite.query.filter(
+            (LibraryPrerequisite.item_id == item.id)
+            | (LibraryPrerequisite.prereq_item_id == item.id)
+        ).delete(synchronize_session=False)
+
+        # Quiz questions + options
+        # Use ORM deletes so cascade="all, delete-orphan" on options can apply.
+        for q in list(item.quiz_questions):
+            # Delete all options for this question
+            QuizOption.query.filter_by(question_id=q.id).delete(synchronize_session=False)
+            db.session.delete(q)
+
+        # Coaching plans that reference this library item
+        CoachingPlanItem.query.filter_by(item_id=item.id).delete(synchronize_session=False)
+
+        # Test course requirements that reference this library item as a "course"
+        TestCourseRequirement.query.filter_by(course_id=item.id).delete(synchronize_session=False)
+
+        # Academy course items that reference this library item
+        ac_items = AcademyCourseItem.query.filter_by(library_item_id=item.id).all()
+        if ac_items:
+            ci_ids = [ci.id for ci in ac_items]
+            AcademyModuleStatus.query.filter(
+                AcademyModuleStatus.course_item_id.in_(ci_ids)
+            ).delete(synchronize_session=False)
+            for ci in ac_items:
+                db.session.delete(ci)
+
+        # --- Delete underlying files from storage (S3/local/GCS) ---
+
+        # Main file
+        if item.filename:
+            try:
+                storage.delete(item.filename)
+            except Exception as e:
+                current_app.logger.warning(
+                    f"Failed to delete main file {item.filename}: {e}"
+                )
+
+        # Thumbnail
+        if item.thumbnail:
+            try:
+                storage.delete(item.thumbnail)
+            except Exception as e:
+                current_app.logger.warning(
+                    f"Failed to delete thumbnail {item.thumbnail}: {e}"
+                )
+
+        # Attachments: delete files + DB rows
+        for att in list(item.attachments):
+            if att.filename:
+                try:
+                    storage.delete(att.filename)
+                except Exception as e:
+                    current_app.logger.warning(
+                        f"Failed to delete attachment {att.filename}: {e}"
+                    )
+            db.session.delete(att)
+
+        # FAQs
+        for faq in list(item.faqs):
+            db.session.delete(faq)
+
+        # Finally, delete the library item itself
+        db.session.delete(item)
+        db.session.commit()
+
+        flash("Item permanently deleted", "danger")
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error deleting LibraryItem {item_id}: {e}")
+        flash("Failed to delete item due to related data or storage error.", "danger")
+
     return redirect(url_for("library.index"))
 
 

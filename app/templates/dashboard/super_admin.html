@@ -64,6 +64,8 @@
         Media Manager
       </a>
     </div>
+
+
     <div class="col-md-3 mb-3">
       <a href="{{ url_for('coaching.list_plans') }}" class="btn btn-light w-100 py-3 shadow-sm">
         <i class="bi bi-lightbulb-fill display-6 d-block mb-2 text-danger"></i>
@@ -98,6 +100,35 @@
         Library Analytics
       </a>
     </div>
+
+
+<div class="col-md-3 mb-3">
+  <a href="{{ url_for('dashboard.system_metrics') }}" class="btn btn-light w-100 py-3 shadow-sm">
+    <i class="bi bi-speedometer2 display-6 d-block mb-2 text-secondary"></i>
+    System Metrics
+  </a>
+</div>
+
+    <div class="col-md-3 mb-3">
+      <div class="btn btn-light w-100 py-3 shadow-sm">
+        <i class="bi bi-hdd-fill display-6 d-block mb-2 text-secondary"></i>
+        Storage Used
+        <br>
+        {% set used_gb = (storage_total_bytes or 0) / (1024**3) %}
+        {% if storage_limit_bytes and storage_limit_bytes > 0 %}
+          {% set limit_gb = storage_limit_bytes / (1024**3) %}
+          <strong>{{ "%.1f"|format(used_gb) }} / {{ "%.1f"|format(limit_gb) }} GB</strong><br>
+          <small class="text-muted">
+            {{ storage_percent }}% of limit
+          </small>
+        {% else %}
+          <strong>{{ "%.1f"|format(used_gb) }} GB</strong><br>
+          <small class="text-muted">No global storage limit configured</small>
+        {% endif %}
+      </div>
+    </div>
+
+
   </div>
 
 </div>

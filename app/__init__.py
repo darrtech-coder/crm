@@ -6,6 +6,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from flask_login import current_user
 from sqlalchemy import inspect
+from .extensions import start_resource_monitor
 
 # Load environment variables from .env file first
 load_dotenv()
@@ -28,6 +29,11 @@ from .coaching import coaching_bp
 from .tests import tests_bp
 from .academy import academy_bp
 from .badges import badges_bp
+
+
+from .utils.settings import get_setting
+
+
 
 # Build a reusable timezone list once at import time
 try:
@@ -58,6 +64,33 @@ def create_app(config_class="config.DevConfig"):
                 app.config["TIMEZONE"] = get_setting("TIMEZONE", "UTC")
                 app.config["REDIS_MODE"] = get_setting("REDIS_MODE", "local")
                 final_redis_url = get_setting("REDIS_URL", initial_redis_url)
+                # Resource monitor settings
+                app.config["RESOURCE_SAMPLING_SECONDS"] = int(
+                    get_setting(
+                        "RESOURCE_SAMPLING_SECONDS",
+                        str(app.config.get("RESOURCE_SAMPLING_SECONDS", 60)),
+                    )
+                )
+                app.config["CPU_ALERT_PERCENT"] = int(
+                    get_setting(
+                        "CPU_ALERT_PERCENT",
+                        str(app.config.get("CPU_ALERT_PERCENT", 90)),
+                    )
+                )
+                app.config["MEM_ALERT_PERCENT"] = int(
+                    get_setting(
+                        "MEM_ALERT_PERCENT",
+                        str(app.config.get("MEM_ALERT_PERCENT", 90)),
+                    )
+                )
+                app.config["DISK_ALERT_PERCENT"] = int(
+                    get_setting(
+                        "DISK_ALERT_PERCENT",
+                        str(app.config.get("DISK_ALERT_PERCENT", 90)),
+                    )
+                )
+
+
                 app.logger.info("✅ Loaded settings from database.")
             else:
                 app.logger.warning("⚠️ No 'system_setting' table found — using smart defaults for setup phase.")
@@ -73,6 +106,14 @@ def create_app(config_class="config.DevConfig"):
             app.config["TIMEZONE"] = "UTC"
             app.config["REDIS_MODE"] = "local"
             final_redis_url = app.config.get("REDIS_URL")
+
+        # Start resource monitor (optionally behind a config flag)
+        if app.config.get("ENABLE_RESOURCE_MONITOR", True):
+            from .extensions import start_resource_monitor
+            app.config["RESOURCE_SAMPLING_SECONDS"] = int(
+                get_setting("RESOURCE_SAMPLING_SECONDS", str(app.config.get("RESOURCE_SAMPLING_SECONDS", 60)))
+            )
+            start_resource_monitor(app, app.config.get("RESOURCE_SAMPLING_SECONDS", 60))
 
         if app.config["REDIS_MODE"] == "none":
             app.config["SESSION_TYPE"] = "filesystem"

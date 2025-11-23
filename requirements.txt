@@ -29,3 +29,4 @@ cryptography
 Flask-FS
 fs-gcsfs
 fs-s3fs
+psutil

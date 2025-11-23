@@ -3,9 +3,10 @@ from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask import current_app
 from flask_session import Session
-import redis
+import redis, os
 import threading
 from datetime import datetime # 
+import psutil
 
 
 from sqlalchemy import event
@@ -174,3 +175,93 @@ def flush_libview_worker():
         t2 = threading.Thread(target=flush_libprog_worker, name="flush_libprog", daemon=True)
         t2.start()
         app.logger.info("✅ Started flush_libprog background worker.")
+
+
+
+import psutil
+
+def start_resource_monitor(app, interval_seconds=60):
+    """Background thread to periodically collect CPU, RAM, disk, storage usage,
+    and send alerts when thresholds are exceeded."""
+
+    from app.system_monitor.models import SystemMetric
+
+    def worker():
+        from app.utils.settings import get_setting, set_setting
+        from app.notifications.utils import notify_roles
+
+        with app.app_context():
+            root_path = os.path.abspath(os.sep)
+            while True:
+                try:
+                    # Sample system resources
+                    cpu = psutil.cpu_percent(interval=None)
+
+                    vm = psutil.virtual_memory()
+                    mem_used_mb = vm.used / (1024 * 1024)
+                    mem_percent = vm.percent
+
+                    du = psutil.disk_usage(root_path)
+                    disk_used_gb = du.used / (1024 * 1024 * 1024)
+                    disk_percent = du.percent
+
+                    # Current storage usage from our running total
+                    total_bytes = int(get_setting("STORAGE_TOTAL_BYTES", "0") or 0)
+
+                    # Insert metric row
+                    m = SystemMetric(
+                        cpu_percent=cpu,
+                        mem_used_mb=mem_used_mb,
+                        mem_percent=mem_percent,
+                        disk_used_gb=disk_used_gb,
+                        disk_percent=disk_percent,
+                        storage_total_bytes=total_bytes,
+                    )
+                    db.session.add(m)
+                    safe_commit()
+
+                    # Threshold alerts
+                    def get_threshold(key, default_cfg):
+                        return int(
+                            get_setting(key, str(app.config.get(default_cfg, 0))) or 0
+                        )
+
+                    cpu_thresh = get_threshold("CPU_ALERT_PERCENT", "CPU_ALERT_PERCENT")
+                    mem_thresh = get_threshold("MEM_ALERT_PERCENT", "MEM_ALERT_PERCENT")
+                    disk_thresh = get_threshold("DISK_ALERT_PERCENT", "DISK_ALERT_PERCENT")
+
+                    def maybe_alert(name, value, threshold):
+                        if not threshold or value < threshold:
+                            return
+                        key_last = f"{name}_ALERT_LAST_SENT"
+                        last_iso = get_setting(key_last, "")
+                        now = datetime.utcnow()
+                        if last_iso:
+                            try:
+                                last_dt = datetime.fromisoformat(last_iso)
+                                # Only alert at most once per hour per metric
+                                if now - last_dt < timedelta(hours=1):
+                                    return
+                            except Exception:
+                                pass
+                        notify_roles(
+                            ("ADMIN", "SUPER_ADMIN"),
+                            f"⚠️ {name} high: {value:.1f}% (threshold {threshold}%)",
+                        )
+                        set_setting(key_last, now.isoformat())
+
+                    maybe_alert("CPU", cpu, cpu_thresh)
+                    maybe_alert("MEMORY", mem_percent, mem_thresh)
+                    maybe_alert("DISK", disk_percent, disk_thresh)
+
+                except Exception as e:
+                    db.session.rollback()
+                    app.logger.warning(f"resource monitor error: {e}")
+                finally:
+                    time.sleep(interval_seconds)
+
+    # Avoid duplicate threads on reload
+    if not any(t.name == "resource_monitor" for t in threading.enumerate()):
+        t = threading.Thread(target=worker, name="resource_monitor", daemon=True)
+        t.start()
+        app.logger.info("✅ Started resource_monitor background worker.")

@@ -7,6 +7,7 @@ from fs.subfs import SubFS
 from werkzeug.utils import secure_filename
 import uuid
 import os
+from io import BytesIO
 
 class StorageManager:
     def __init__(self, app=None):
@@ -20,6 +21,45 @@ class StorageManager:
     def init_app(self, app):
         self.app = app
         app.extensions['storage_manager'] = self
+
+
+    def _record_storage_delta(self, delta_bytes: int):
+        """Adjust global storage usage counter by delta_bytes (can be negative).
+           Also sends alerts if we cross configured storage thresholds.
+        """
+        try:
+            from ..utils.settings import get_setting, set_setting
+            from ..notifications.utils import notify_roles
+
+            current = int(get_setting("STORAGE_TOTAL_BYTES", "0") or 0)
+            new_total = max(0, current + int(delta_bytes))
+            set_setting("STORAGE_TOTAL_BYTES", new_total)
+
+            # Check against storage limit, if configured
+            limit_bytes = int(get_setting("STORAGE_LIMIT_BYTES", "0") or 0)
+            if limit_bytes > 0 and new_total > 0:
+                usage_ratio = new_total / limit_bytes
+
+                # Determine alert level (simple 80/90/100% thresholds)
+                last_level = get_setting("STORAGE_LIMIT_ALERT_LEVEL", "none")
+                level = "none"
+                if usage_ratio >= 1.0:
+                    level = "full"
+                elif usage_ratio >= 0.9:
+                    level = "90"
+                elif usage_ratio >= 0.8:
+                    level = "80"
+
+                if level != "none" and level != last_level:
+                    gb_used = new_total / (1024**3)
+                    gb_limit = limit_bytes / (1024**3)
+                    notify_roles(
+                        ("ADMIN", "SUPER_ADMIN"),
+                        f"⚠️ Storage usage {gb_used:.1f}GB / {gb_limit:.1f}GB ({usage_ratio:.0%})."
+                    )
+                    set_setting("STORAGE_LIMIT_ALERT_LEVEL", level)
+        except Exception as e:
+            current_app.logger.warning(f"Failed updating storage total: {e}")
 
     @property
     def fs(self):
@@ -108,8 +148,27 @@ class StorageManager:
         
         full_path = f"{subfolder}/{filename}"
         self.fs.makedirs(subfolder, recreate=True)
+
+        # Measure size BEFORE writing
+        size_bytes = 0
+        try:
+            pos = file_storage.tell()
+            file_storage.seek(0, os.SEEK_END)
+            size_bytes = file_storage.tell()
+            file_storage.seek(0, os.SEEK_SET)
+        except Exception:
+            data = file_storage.read()
+            size_bytes = len(data)
+            file_storage = BytesIO(data)
+
+
         file_storage.seek(0)
         self.fs.writebytes(full_path, file_storage.read())
+
+        # Record storage delta
+        if size_bytes:
+            self._record_storage_delta(size_bytes)
+
         return full_path
 
     def get_url(self, path):
@@ -137,7 +196,19 @@ class StorageManager:
             return url_for('storage.serve_file', path=path)
 
     def delete(self, path):
-        if self.fs.exists(path):
-            self.fs.remove(path)
+        if not self.fs.exists(path):
+            return
+        size_bytes = 0
+        try:
+            info = self.fs.getinfo(path, namespaces=["details"])
+            # fs.info.size works across OSFS, S3FS, GCSFS
+            size_bytes = getattr(info, "size", None) or info.raw.get("size", 0)
+        except Exception:
+            size_bytes = 0
+
+        self.fs.remove(path)
+
+        if size_bytes:
+            self._record_storage_delta(-size_bytes)
 
 storage = StorageManager()
