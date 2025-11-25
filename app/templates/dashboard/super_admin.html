@@ -117,12 +117,12 @@
         {% set used_gb = (storage_total_bytes or 0) / (1024**3) %}
         {% if storage_limit_bytes and storage_limit_bytes > 0 %}
           {% set limit_gb = storage_limit_bytes / (1024**3) %}
-          <strong>{{ "%.1f"|format(used_gb) }} / {{ "%.1f"|format(limit_gb) }} GB</strong><br>
+          <strong>{{ "%.4f"|format(used_gb) }} / {{ "%.4f"|format(limit_gb) }} GB</strong><br>
           <small class="text-muted">
             {{ storage_percent }}% of limit
           </small>
         {% else %}
-          <strong>{{ "%.1f"|format(used_gb) }} GB</strong><br>
+          <strong>{{ "%.4f"|format(used_gb) }} GB</strong><br>
           <small class="text-muted">No global storage limit configured</small>
         {% endif %}
       </div>
