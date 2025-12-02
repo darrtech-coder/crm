@@ -249,6 +249,21 @@ def super_admin_settings():
             limit_bytes = 0
 
         set_setting("STORAGE_LIMIT_BYTES", limit_bytes)
+
+
+        # NEW: optional override of current total storage usage
+        override_gb_str = request.form.get("storage_total_gb", "").strip()
+        if override_gb_str:
+            try:
+                override_gb = float(override_gb_str)
+                override_bytes = int(override_gb * 1024**3)
+                set_setting("STORAGE_TOTAL_BYTES", override_bytes)
+                # Reset alert level so new thresholds are recalculated cleanly
+                set_setting("STORAGE_LIMIT_ALERT_LEVEL", "none")
+            except ValueError:
+                flash("Invalid value for storage usage override; ignoring.", "warning")
+
+
         
         gcs_keyfile = request.files.get("gcs_keyfile_upload")
         if gcs_keyfile and gcs_keyfile.filename:
@@ -290,6 +305,7 @@ def super_admin_settings():
         "mem_alert_percent": int(get_setting("MEM_ALERT_PERCENT", "90")),
         "disk_alert_percent": int(get_setting("DISK_ALERT_PERCENT", "90")),
         "storage_limit_bytes": int(get_setting("STORAGE_LIMIT_BYTES", "0") or 0),
+        "storage_total_bytes": int(get_setting("STORAGE_TOTAL_BYTES", "0") or 0),
     }
     # [THIS IS THE FIX] Pass tz_list to the template
     return render_template("dashboard/settings.html", settings=vals, tz_list=TZ_LIST)

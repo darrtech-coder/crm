@@ -70,6 +70,16 @@
                        placeholder="e.g. 10">
                 <small class="text-muted">Total storage capacity you’ve paid for.</small>
             </div>
+
+            {# NEW: manual override of tracked total usage #}
+            <div class="col-md-4">
+                <label class="form-label">Current Usage Override (GB)</label>
+                <input type="number" step="0.1" class="form-control" name="storage_total_gb"
+                       placeholder="Leave blank to keep current">
+                <small class="text-muted">
+                  Currently tracked: {{ ((settings.storage_total_bytes | default(0, true)) | int / (1024**3)) | round(3) }} GB
+                </small>
+            </div>
         </div>
 
 
