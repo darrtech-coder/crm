@@ -152,36 +152,10 @@
       <label>Thumbnail</label>
       <input type="file" name="thumbnail" accept="image/*" class="form-control">
       {% if item.thumbnail %}
-        <img src="{{ url_for('library.download_item', item_id=item.id, thumb=1) }}" width="120"  class="mt-2 thumbnail-img" >
+        <img src="{{ url_for('library.download_item', item_id=item.id, thumb=1) }}"
+             width="120" class="mt-2 thumbnail-img">
       {% endif %}
     </div>
-
-
-    <!-- Existing attachments -->
-    {% if item.attachments %}
-    <div class="mb-3">
-      <label class="form-label">Existing Attachments</label>
-      <ul class="list-group">
-        {% for a in item.attachments %}
-          <li class="list-group-item d-flex justify-content-between align-items-center">
-            <span>{{ a.filename.split('/')[-1] }}</span>
-            <div class="d-flex gap-2">
-              <a href="{{ storage.get_url(a.filename) }}" target="_blank"
-                 class="btn btn-sm btn-outline-info">View</a>
-              <form method="POST"
-                    action="{{ url_for('library.delete_attachment', attach_id=a.id) }}"
-                    onsubmit="return confirm('Delete this attachment?');"
-                    class="d-inline">
-                <button class="btn btn-sm btn-outline-danger">Delete</button>
-              </form>
-            </div>
-          </li>
-        {% endfor %}
-      </ul>
-    </div>
-    {% endif %}
-
-
 
     <div class="mb-3">
       <label>Add Attachments</label>
@@ -189,9 +163,34 @@
     </div>
 
     <button type="submit" class="btn btn-success">Save Changes</button>
-    <a href="{{ url_for('library.view_item', item_id=item.id) }}" class="btn btn-secondary">Cancel</a>
-  </form>
-</div>
+    <a href="{{ url_for('library.view_item', item_id=item.id) }}"
+       class="btn btn-secondary">Cancel</a>
+  </form>   {# <-- CLOSE MAIN FORM HERE #}
+
+  {# Existing attachments section is now outside the main form #}
+  {% if item.attachments %}
+  <div class="mt-4 mb-3">
+    <label class="form-label">Existing Attachments</label>
+    <ul class="list-group">
+      {% for a in item.attachments %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span>{{ a.filename.split('/')[-1] }}</span>
+          <div class="d-flex gap-2">
+            <a href="{{ storage.get_url(a.filename) }}" target="_blank"
+               class="btn btn-sm btn-outline-info">View</a>
+            <form method="POST"
+                  action="{{ url_for('library.delete_attachment', attach_id=a.id) }}"
+                  onsubmit="return confirm('Delete this attachment?');"
+                  class="d-inline">
+              <button class="btn btn-sm btn-outline-danger">Delete</button>
+            </form>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>  
 
 
 {# -------------------- [START] New JavaScript for user search -------------------- #}
