@@ -835,6 +835,7 @@ def system_metrics():
         return redirect(url_for("dashboard.index"))
 
     from sqlalchemy import func
+    from app.utils.datetime_tools import convert_for_render
 
     now = datetime.utcnow()
 
@@ -853,6 +854,15 @@ def system_metrics():
     storage_gb = [
         (m.storage_total_bytes or 0) / (1024**3) for m in recent
     ]
+
+    # Time labels in active timezone (per user if set)
+    if recent:
+        time_labels = convert_for_render(
+            [m.ts for m in recent],
+            fmt="%H:%M"
+        )
+    else:
+        time_labels = []
 
     # --- Daily aggregates for last 7 days ---
     seven_days_ago = now - timedelta(days=7)
@@ -897,6 +907,15 @@ def system_metrics():
         float((row.storage_max or 0) / (1024**3)) for row in daily_rows
     ]
 
+    # Daily labels (dates) in active timezone
+    if daily_rows:
+        daily_labels = convert_for_render(
+            [row.day for row in daily_rows],
+            fmt="%Y-%m-%d"
+        )
+    else:
+        daily_labels = []
+
     return render_template(
         "dashboard/system_metrics.html",
         recent=recent,
@@ -913,6 +932,8 @@ def system_metrics():
         daily_disk_max=daily_disk_max,
         daily_storage_avg_gb=daily_storage_avg_gb,
         daily_storage_max_gb=daily_storage_max_gb,
+        time_labels=time_labels,
+        daily_labels=daily_labels,
     )
 
 
