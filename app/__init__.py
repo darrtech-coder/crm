@@ -60,7 +60,7 @@ def create_app(config_class="config.DevConfig"):
             initial_redis_url = app.config.get("REDIS_URL")
 
             if inspector.has_table("system_setting"):
-                from .utils.settings import get_setting
+                # from .utils.settings import get_setting
                 app.config["TIMEZONE"] = get_setting("TIMEZONE", "UTC")
                 app.config["REDIS_MODE"] = get_setting("REDIS_MODE", "local")
                 final_redis_url = get_setting("REDIS_URL", initial_redis_url)

@@ -1,10 +1,21 @@
 <div class="card p-3 shadow-sm">
   <!-- Main file preview -->
   {% if item.filename %}
-    {% if "video" in item.mime %}
-      <video class="media-player" controls style="width:100%">
-        <source src="{{ storage.get_url(item.filename) }}" type="{{ item.mime }}">
-      </video>
+{% if "video" in item.mime %}
+  <video class="media-player" controls style="width:100%">
+    <source src="{{ storage.get_url(item.filename) }}" type="{{ item.mime }}">
+
+    {# Look for subtitle attachments (.vtt or .srt) #}
+    {% for a in item.attachments %}
+      {% set lower = (a.filename or "")|lower %}
+      {% if lower.endswith('.vtt') or lower.endswith('.srt') %}
+        <track kind="subtitles"
+               srclang="en"
+               label="{{ a.filename.split('/')[-1] }}"
+               src="{{ storage.get_url(a.filename) }}">
+      {% endif %}
+    {% endfor %}
+  </video>
     {% elif "audio" in item.mime %}
       <audio class="media-player" controls style="width:100%">
         <source src="{{ storage.get_url(item.filename) }}" type="{{ item.mime }}">

@@ -67,8 +67,9 @@
 
         {% elif ans.question.type == 'audio' %}
           {% if ans.answer_audio %}
+            {% set audio_path = ans.answer_audio if '/' in ans.answer_audio else 'tests/audio_answers/' ~ ans.answer_audio %}
             <audio controls class="w-100">
-              <source src="{{ url_for('presentations.media_file', filename='audio_answers/' ~ ans.answer_audio) }}">
+              <source src="{{ storage.get_url(audio_path) }}">
               Your browser does not support the audio element.
             </audio>
           {% else %}

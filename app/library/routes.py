@@ -559,81 +559,114 @@ def mark_trending(item_id):
 @login_required
 @role_required("MANAGER","ADMIN","SUPER_ADMIN")
 def edit_item(item_id):
+    from ..utils.storage import storage  # ensure imported at top of file as well
     item = LibraryItem.query.get_or_404(item_id)
-    upload_dir = os.path.join(current_app.root_path, "..", "uploads", "library")
-    os.makedirs(upload_dir, exist_ok=True)
 
     if request.method == "POST":
+        # --- Basic metadata ---
         item.title = request.form["title"]
         item.description = request.form.get("description")
         item.keywords = request.form.get("keywords")
         item.category_id = int(request.form.get("category_id")) if request.form.get("category_id") else None
         item.manager_only = bool(request.form.get("manager_only"))
 
-        # replace main file if new one uploaded
+        # Unlisted flag (if model has it)
+        if hasattr(LibraryItem, "unlisted"):
+            item.unlisted = bool(request.form.get("unlisted"))
+
+        # --- Replace main file (via storage) if a new one uploaded ---
         new_file = request.files.get("file")
         if new_file and allowed_file(new_file.filename):
-            filename = secure_filename(new_file.filename)
-            new_path = os.path.join(upload_dir, filename)
-            new_file.save(new_path)
-            item.filename = filename
-            item.mime = new_file.mimetype
-            item.size = os.path.getsize(new_path)
+            # Delete existing main file if present
+            if item.filename:
+                try:
+                    storage.delete(item.filename)
+                except Exception as e:
+                    current_app.logger.warning(f"Failed to delete old main file {item.filename}: {e}")
 
-        # replace thumbnail if new uploaded
+            # Determine file size (optional)
+            try:
+                new_file.seek(0, os.SEEK_END)
+                file_size = new_file.tell()
+                new_file.seek(0)
+            except Exception:
+                file_size = None
+
+            # Save to storage under a library/main subfolder
+            saved_path = storage.save(new_file, subfolder="library/main", filename=new_file.filename)
+            item.filename = saved_path
+            item.mime = new_file.mimetype
+            if file_size is not None:
+                item.size = file_size
+
+        # --- Replace thumbnail (via storage) if new uploaded ---
         thumb_file = request.files.get("thumbnail")
         if thumb_file and allowed_file(thumb_file.filename):
-            t_name = secure_filename(thumb_file.filename)
-            t_path = os.path.join(upload_dir, t_name)
-            thumb_file.save(t_path)
-            item.thumbnail = t_name
+            # Delete existing thumbnail if present
+            if item.thumbnail:
+                try:
+                    storage.delete(item.thumbnail)
+                except Exception as e:
+                    current_app.logger.warning(f"Failed to delete old thumbnail {item.thumbnail}: {e}")
 
-        # add new attachments
+            thumb_path = storage.save(thumb_file, subfolder="library/thumbnails", filename=thumb_file.filename)
+            item.thumbnail = thumb_path
+
+        # --- Add new attachments (via storage) ---
         for attach in request.files.getlist("attachments"):
             if attach and allowed_file(attach.filename):
-                a_name = secure_filename(attach.filename)
-                a_path = os.path.join(upload_dir, a_name)
-                attach.save(a_path)
+                try:
+                    attach.seek(0, os.SEEK_END)
+                    attach_size = attach.tell()
+                    attach.seek(0)
+                except Exception:
+                    attach_size = None
+
+                attach_path = storage.save(attach, subfolder="library/attachments", filename=attach.filename)
                 db.session.add(LibraryAttachment(
-                    item_id=item.id, filename=a_name,
-                    mime=attach.mimetype, size=os.path.getsize(a_path)
+                    item_id=item.id,
+                    filename=attach_path,
+                    mime=attach.mimetype,
+                    size=attach_size or 0
                 ))
 
-        # 🔥 Restrict access
+        # --- Restrict access (teams + specific users) ---
         team_ids = request.form.getlist("team_ids")
-        # -------------------- [START] Update user_ids handling --------------------
+
         user_ids_str = request.form.get("user_ids", "")
         user_ids = [int(uid) for uid in user_ids_str.split(',') if uid.strip().isdigit()]
 
-        # Clear existing user/team specific rules before adding new ones
+        # Clear existing rules before adding new ones
         LibraryAccess.query.filter_by(item_id=item.id).delete()
-        # -------------------- [END] Update user_ids handling --------------------
+
         for tid in team_ids:
             if tid:
                 db.session.add(LibraryAccess(item_id=item.id, team_id=int(tid)))
-        # -------------------- [START] Update user_ids loop --------------------
         for uid in user_ids:
             db.session.add(LibraryAccess(item_id=item.id, user_id=uid))
-        # -------------------- [END] Update user_ids loop --------------------
 
-
+        # --- Prerequisites ---
         prereq_str = request.form.get("prereq_item_ids", "")
         prereq_ids = [int(x) for x in prereq_str.split(",") if x.strip().isdigit()]
-        # Clear existing
+
+        # Clear existing prereqs for this item
         LibraryPrerequisite.query.filter_by(item_id=item.id).delete()
-        # Add new
+        # Add new ones
         for pid in prereq_ids:
             if pid != item.id:
                 db.session.add(LibraryPrerequisite(item_id=item.id, prereq_item_id=pid))
-
-
 
         db.session.commit()
         flash("Item updated", "success")
         return redirect(url_for("library.view_item", item_id=item.id))
 
     categories = LibraryCategory.query.all()
-    return render_template("library/edit_item.html", item=item, categories=categories, teams=Team.query.all())
+    return render_template(
+        "library/edit_item.html",
+        item=item,
+        categories=categories,
+        teams=Team.query.all()
+    )
 
 
 # ---------------- Archive/Delete Item ----------------
@@ -923,3 +956,22 @@ def search_teams():
     teams = query.order_by(Team.name.asc()).limit(10).all()
     results = [{"id": team.id, "text": team.name} for team in teams]
     return jsonify(results)
+
+
+@library_bp.route("/attachment/<int:attach_id>/delete", methods=["POST"])
+@login_required
+@role_required("MANAGER", "ADMIN", "SUPER_ADMIN")
+def delete_attachment(attach_id):
+    att = LibraryAttachment.query.get_or_404(attach_id)
+    item_id = att.item_id
+    try:
+        if att.filename:
+            from ..utils.storage import storage
+            storage.delete(att.filename)
+    except Exception as e:
+        current_app.logger.warning(f"Failed to delete attachment file {att.filename}: {e}")
+
+    db.session.delete(att)
+    db.session.commit()
+    flash("Attachment deleted.", "success")
+    return redirect(url_for("library.edit_item", item_id=item_id))

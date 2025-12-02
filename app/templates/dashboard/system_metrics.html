@@ -20,12 +20,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 // Time labels in the configured timezone (per-user if set).
-const labels = {{ recent
-    | map(attribute='ts')
-    | map('tz', "%H:%M")
-    | list
-    | tojson
-}};
+const labels = {{ time_labels|tojson }};
 
 const cpu = {{ cpu|tojson }};
 const mem = {{ mem|tojson }};
@@ -33,12 +28,7 @@ const disk = {{ disk|tojson }};
 const storage = {{ storage_gb|tojson }};
 
 // Daily labels: each aggregated 'day' formatted via tz filter.
-const dailyLabels = {{ daily_rows
-    | map(attribute='day')
-    | map('tz', "%Y-%m-%d")
-    | list
-    | tojson
-}};
+const dailyLabels = {{ daily_labels|tojson }};
 
 const dailyCpuAvg = {{ daily_cpu_avg|tojson }};
 const dailyCpuMax = {{ daily_cpu_max|tojson }};

@@ -7,6 +7,8 @@ from datetime import datetime, timedelta # Add timedelta
 from werkzeug.utils import secure_filename
 import os, json, base64, uuid
 
+from ..utils.storage import storage
+
 import zipfile, tempfile, json, csv, re, os
 from flask import send_file, after_this_request
 
@@ -144,34 +146,35 @@ def take(test_id):
                         submission_id=submission.id, question_id=q.id, answer_text=txt.strip()
                     ))
             elif q.type == "audio":
-                audio_filename = None
-                
-                # Case 1: Recorded audio (sends a filename)
-                temp_filename = request.form.get(f"recorded_audio_{q.id}")
-                if temp_filename:
-                    temp_path = os.path.join(current_app.root_path, "..", "uploads", "media", "audio_temp", temp_filename)
-                    final_dir = os.path.join(current_app.root_path, "..", "uploads", "media", "audio_answers")
-                    os.makedirs(final_dir, exist_ok=True)
-                    final_path = os.path.join(final_dir, temp_filename)
+                audio_path = None
 
-                    if os.path.exists(temp_path):
-                        os.rename(temp_path, final_path)
-                        audio_filename = temp_filename
+                # Case 1: Recorded audio (hidden field contains storage path)
+                temp_path = request.form.get(f"recorded_audio_{q.id}")
+                if temp_path:
+                    # temp_path may be full path or just a filename
+                    if "/" not in temp_path:
+                        temp_path = f"tests/audio_temp/{temp_path}"
+                    moved = storage.move(temp_path, "tests/audio_answers")
+                    if moved:
+                        audio_path = moved
                     else:
-                        current_app.logger.warning(f"Temporary audio file not found: {temp_path}")
+                        current_app.logger.warning(f"Failed to move recorded audio from {temp_path}")
 
-                # Case 2: Uploaded audio file
+                # Case 2: Uploaded audio file via file input
                 uploaded_file = request.files.get(qid_str)
                 if uploaded_file and uploaded_file.filename:
-                    final_dir = os.path.join(current_app.root_path, "..", "uploads", "media", "audio_answers")
-                    os.makedirs(final_dir, exist_ok=True)
-                    audio_filename = secure_filename(f"{uuid.uuid4().hex}_{uploaded_file.filename}")
-                    uploaded_file.save(os.path.join(final_dir, audio_filename))
-                
-                # if audio_filename:
+                    saved = storage.save(
+                        uploaded_file,
+                        subfolder="tests/audio_answers",
+                        filename=f"{uuid.uuid4().hex}_{uploaded_file.filename}"
+                    )
+                    audio_path = saved
+
                 db.session.add(TestAnswer(
-                    submission_id=submission.id, question_id=q.id,
-                    answer_audio=audio_filename, score=0.0
+                    submission_id=submission.id,
+                    question_id=q.id,
+                    answer_audio=audio_path,
+                    score=0.0
                 ))
             # -------------------- [END] CORRECTED IF/ELIF BLOCK --------------------
 
@@ -308,11 +311,8 @@ def add_question(test_id):
     # --- optional: handle new media when creating ---
     file = request.files.get("media")
     if file and file.filename:
-        upload_dir = os.path.join(current_app.root_path, "..", "uploads", "question_media")
-        os.makedirs(upload_dir, exist_ok=True)
-        fname = secure_filename(file.filename)
-        file.save(os.path.join(upload_dir, fname))
-        q.media_path = fname
+        saved_path = storage.save(file, subfolder="tests/question_media", filename=file.filename)
+        q.media_path = saved_path
 
     if qtype == "mcq":
         # Options come as repeated form fields
@@ -345,14 +345,13 @@ def edit_question(qid):
     if current_user.role not in ("MANAGER", "ADMIN", "SUPER_ADMIN"):
         abort(403)
 
-    upload_dir = os.path.join(current_app.root_path, "..", "uploads", "question_media")
-    os.makedirs(upload_dir, exist_ok=True)
-
     if request.method == "POST":
+        # Delete existing media
         if "delete_media" in request.form and q.media_path:
             try:
-                os.remove(os.path.join(upload_dir, q.media_path))
-            except FileNotFoundError:
+                path = q.media_path if "/" in q.media_path else f"tests/question_media/{q.media_path}"
+                storage.delete(path)
+            except Exception:
                 pass
             q.media_path = None
             db.session.commit()
@@ -361,16 +360,17 @@ def edit_question(qid):
 
         q.question = request.form.get("question", "")
 
+        # Replace / add media
         file = request.files.get("media")
         if file and file.filename:
             if q.media_path:
                 try:
-                    os.remove(os.path.join(upload_dir, q.media_path))
-                except FileNotFoundError:
+                    path = q.media_path if "/" in q.media_path else f"tests/question_media/{q.media_path}"
+                    storage.delete(path)
+                except Exception:
                     pass
-            fname = secure_filename(f"{uuid.uuid4().hex}_{file.filename}")
-            file.save(os.path.join(upload_dir, fname))
-            q.media_path = fname
+            saved_path = storage.save(file, subfolder="tests/question_media", filename=file.filename)
+            q.media_path = saved_path
 
         # [FIX] Correctly update MCQ options
         if q.type == "mcq":
@@ -439,9 +439,16 @@ from flask import send_from_directory
 @tests_bp.route("/media/<path:filename>")
 @login_required
 def question_media(filename):
-    """Serve uploaded question media (images/videos/audio)."""
-    media_dir = os.path.join(current_app.root_path, "..", "uploads", "question_media")
-    return send_from_directory(media_dir, filename)
+    """
+    Serve question media via the storage backend.
+    For new items, TestQuestion.media_path stores the full storage path.
+    For legacy items with bare filenames, assume tests/question_media/<filename>.
+    """
+    if "/" in filename:
+        path = filename
+    else:
+        path = f"tests/question_media/{filename}"
+    return redirect(storage.get_url(path))
 
 
 @tests_bp.route("/<int:test_id>/question/<int:index>")
@@ -693,14 +700,15 @@ def add_questions_bulk(test_id):
         q = TestQuestion(test_id=test.id, type=qtype, question=qtext)
         db.session.add(q)
         
-        # Handle optional media upload for this question
+        # Handle optional media upload for this question (via storage)
         media_file = request.files.get(f"media_{i}")
         if media_file and media_file.filename:
-            upload_dir = os.path.join(current_app.root_path, "..", "uploads", "question_media")
-            os.makedirs(upload_dir, exist_ok=True)
-            fname = secure_filename(f"{uuid.uuid4().hex}_{media_file.filename}")
-            media_file.save(os.path.join(upload_dir, fname))
-            q.media_path = fname
+            saved_path = storage.save(
+                media_file,
+                subfolder="tests/question_media",
+                filename=media_file.filename
+            )
+            q.media_path = saved_path
 
         db.session.flush()  # Flush to get q.id for options
 
@@ -843,19 +851,12 @@ def upload_audio_chunk():
         return jsonify({"ok": False, "error": "No audio blob in request"}), 400
 
     file = request.files['audio_blob']
-    
-    # Use a temporary directory for these chunks
-    temp_dir = os.path.join(current_app.root_path, "..", "uploads", "media", "audio_temp")
-    os.makedirs(temp_dir, exist_ok=True)
-    
-    # Create a unique filename
-    filename = f"{current_user.id}_{uuid.uuid4().hex}.webm"
-    save_path = os.path.join(temp_dir, filename)
 
     try:
-        file.save(save_path)
-        # Return the filename so the frontend can store it
-        return jsonify({"ok": True, "filename": filename})
+        filename = f"{current_user.id}_{uuid.uuid4().hex}.webm"
+        saved_path = storage.save(file, subfolder="tests/audio_temp", filename=filename)
+        # Return the storage path so the frontend can store it
+        return jsonify({"ok": True, "filename": saved_path})
     except Exception as e:
         current_app.logger.error(f"Could not save audio chunk: {e}")
         return jsonify({"ok": False, "error": "Server failed to save audio"}), 500
@@ -932,7 +933,7 @@ def export_test_answers_zip(test_id):
     tmp.close()
 
     root = f"test_{test.id}_{slugify(test.title)}"
-    audio_dir = os.path.join(current_app.root_path, "..", "uploads", "media", "audio_answers")
+    fs = storage.fs
 
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         # Optional: include a top-level manifest
@@ -990,16 +991,20 @@ def export_test_answers_zip(test_id):
             zf.writestr(sub_dir + "answers.csv", sio.read())
             sio.close()
 
-            # Copy audio files
+            # Copy audio files from storage
             for ans in sub.answers:
                 if ans.answer_audio:
-                    src = os.path.join(audio_dir, ans.answer_audio)
-                    if os.path.exists(src):
-                        zf.write(src, arcname=sub_dir + "audio/" + ans.answer_audio)
-                    else:
-                        # leave a note if missing
-                        miss = {"missing_audio": ans.answer_audio, "note": "File not found on server"}
-                        zf.writestr(sub_dir + "audio/_missing_" + slugify(ans.answer_audio) + ".json", json.dumps(miss, indent=2))
+                    audio_path = ans.answer_audio if "/" in ans.answer_audio else f"tests/audio_answers/{ans.answer_audio}"
+                    try:
+                        data = fs.readbytes(audio_path.lstrip("/"))
+                        arcname = sub_dir + "audio/" + os.path.basename(audio_path)
+                        zf.writestr(arcname, data)
+                    except Exception:
+                        miss = {"missing_audio": audio_path, "note": "File not found in storage"}
+                        zf.writestr(
+                            sub_dir + "audio/_missing_" + slugify(audio_path) + ".json",
+                            json.dumps(miss, indent=2)
+                        )
 
     @after_this_request
     def cleanup(response):
@@ -1114,3 +1119,4 @@ def update_course_req(req_id):
     db.session.commit()
     
     return jsonify({"ok": True, "message": f"Requirement updated to '{new_type.capitalize()}'."})
+

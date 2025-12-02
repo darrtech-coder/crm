@@ -39,6 +39,10 @@ class Config:
     ENABLE_RESOURCE_MONITOR = True
     RESOURCE_SAMPLING_SECONDS = 60
 
+    CPU_ALERT_PERCENT = int(os.environ.get("CPU_ALERT_PERCENT", "90"))
+    MEM_ALERT_PERCENT = int(os.environ.get("MEM_ALERT_PERCENT", "90"))
+    DISK_ALERT_PERCENT = int(os.environ.get("DISK_ALERT_PERCENT", "90"))
+
 class DevConfig(Config):
     DEBUG = True
 
